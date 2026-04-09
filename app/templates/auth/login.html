@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Anmelden — BauNavigator{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">⌂</div>
+      <div class="auth-logo-name">BauNavigator</div>
+      <div class="auth-logo-sub">Ihr intelligenter Baubegleiter</div>
+    </div>
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">E-Mail <span class="req">*</span></label>
+        <input type="email" name="email" class="form-control" required autofocus>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort <span class="req">*</span></label>
+        <input type="password" name="password" class="form-control" required>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" name="remember" id="remember">
+        <label for="remember" style="font-size:13px;cursor:pointer">Angemeldet bleiben</label>
+      </div>
+      <button type="submit" class="btn btn-primary w-full btn-lg">Anmelden</button>
+    </form>
+    <p class="text-center mt-16 text-small text-muted">
+      Noch kein Konto? <a href="{{ url_for('auth.register') }}">Registrieren</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

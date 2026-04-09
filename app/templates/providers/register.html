@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Als Anbieter registrieren — BauNavigator{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Als Fachbetrieb registrieren</h1>
+  <p class="page-subtitle">Wir prüfen Ihre Angaben und Zulassungen vor der Freischaltung</p>
+</div>
+
+<div style="max-width:640px;">
+  <div class="card mb-16" style="background:var(--c-blue-l);border-color:var(--c-blue);">
+    <p style="font-size:13px;color:var(--c-blue);">
+      ✓ Alle Anbieter werden manuell geprüft: Gewerbeanmeldung, Meisterbrief/Kammermitgliedschaft,
+      Haftpflichtversicherung und USt-IdNr. (VIES). Erst nach Prüfung werden Sie sichtbar.
+    </p>
+  </div>
+
+  <div class="card">
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Firmenname <span class="req">*</span></label>
+          <input type="text" name="company_name" class="form-control" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rechtsform</label>
+          <select name="legal_form" class="form-control">
+            <option>GmbH</option><option>GmbH & Co. KG</option><option>GbR</option>
+            <option>Einzelunternehmen</option><option>OHG</option><option>AG</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">E-Mail <span class="req">*</span></label>
+          <input type="email" name="contact_email" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <input type="tel" name="contact_phone" class="form-control">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">USt-IdNr.</label>
+          <input type="text" name="vat_id" class="form-control" placeholder="DE123456789">
+          <div class="form-hint">Wird automatisch via VIES geprüft</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Handelsregisternr.</label>
+          <input type="text" name="handelsreg_nr" class="form-control" placeholder="HRB 12345 AG Frankfurt">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Website</label>
+        <input type="url" name="website" class="form-control" placeholder="https://ihre-firma.de">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Kurzbeschreibung Ihres Unternehmens</label>
+        <textarea name="description" class="form-control" rows="4"
+          placeholder="Was machen Sie? Erfahrung, Spezialisierungen, Arbeitsgebiet..."></textarea>
+      </div>
+
+      <div class="flex gap-8 mt-16">
+        <button type="submit" class="btn btn-primary btn-lg">Registrierung einreichen</button>
+        <a href="{{ url_for('providers.index') }}" class="btn btn-secondary btn-lg">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

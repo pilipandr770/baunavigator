@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Finanzierung — {{ project.title }}{% endblock %}
+{% block content %}
+<span data-csrf="{{ csrf_token() }}"></span>
+
+<div class="page-header">
+  <div class="text-small text-muted mb-8">
+    <a href="{{ url_for('project.detail', project_id=project.id) }}">{{ project.title }}</a> →
+  </div>
+  <h1 class="page-title">Finanzierungsplan</h1>
+</div>
+
+{% set fin = project.financing %}
+
+<div class="grid-2" style="gap:20px;">
+
+  <!-- Form -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">Finanzierungsdaten eingeben</div></div>
+    <form method="POST" action="{{ url_for('project.financing_save', project_id=project.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group">
+        <label class="form-label">Eigenkapital (€)</label>
+        <input type="number" name="eigenkapital" class="form-control"
+               value="{{ fin.eigenkapital or '' }}" placeholder="80000">
+        <div class="form-hint">Eigene Mittel inkl. Bausparvertrag, Schenkung</div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+        <div class="card-title mb-16" style="font-size:13px;">KfW-Förderung</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">KfW-Programm</label>
+            <select name="kfw_program" class="form-control">
+              <option value="">— auswählen —</option>
+              <option {{ 'selected' if fin and fin.kfw_program == 'KFW-124' }} value="KFW-124">KfW 124 — Wohneigentum</option>
+              <option {{ 'selected' if fin and fin.kfw_program == 'KFW-261' }} value="KFW-261">KfW 261 — Energieeffizient Bauen</option>
+              <option {{ 'selected' if fin and fin.kfw_program == 'KFW-300' }} value="KFW-300">KfW 300 — Klimafreundlich Neubau</option>
+              <option {{ 'selected' if fin and fin.kfw_program == 'KFW-270' }} value="KFW-270">KfW 270 — Erneuerbare Energien</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">KfW-Betrag (€)</label>
+            <input type="number" name="kfw_amount" class="form-control"
+                   value="{{ fin.kfw_amount or '' }}" placeholder="150000">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">KfW-Zinssatz (%)</label>
+            <input type="number" step="0.01" name="kfw_zinssatz" class="form-control"
+                   value="{{ fin.kfw_zinssatz or '' }}" placeholder="2.45">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Landesförderung WIBank (€)</label>
+            <input type="number" name="landesfoerderung_amount" class="form-control"
+                   value="{{ fin.landesfoerderung_amount or '' }}" placeholder="20000">
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px;">
+        <div class="card-title mb-16" style="font-size:13px;">Bankdarlehen</div>
+        <div class="form-group">
+          <label class="form-label">Bank</label>
+          <input type="text" name="bank_name" class="form-control"
+                 value="{{ fin.bank_name or '' }}" placeholder="Commerzbank, Sparkasse...">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Darlehensbetrag (€)</label>
+            <input type="number" name="bank_loan_amount" id="bank_loan_amount" class="form-control"
+                   value="{{ fin.bank_loan_amount or '' }}" placeholder="250000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Zinssatz p.a. (%)</label>
+            <input type="number" step="0.01" name="bank_zinssatz" id="bank_zinssatz" class="form-control"
+                   value="{{ fin.bank_zinssatz or '' }}" placeholder="3.80">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Laufzeit (Jahre)</label>
+            <input type="number" name="laufzeit_years" id="laufzeit_years" class="form-control"
+                   value="{{ fin.laufzeit_years or '' }}" placeholder="30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monatliche Rate (Vorschau)</label>
+            <div style="padding: 8px 12px; background: var(--c-blue-l); border-radius: var(--radius); font-weight:600; color: var(--c-blue);">
+              <span id="monthly-rate-preview">
+                {% if fin and fin.monthly_rate %}
+                  {{ "%.2f"|format(fin.monthly_rate|float) }} €
+                {% else %}—{% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary mt-16">Speichern</button>
+    </form>
+  </div>
+
+  <!-- Summary + AI -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    {% if fin %}
+    <div class="card">
+      <div class="card-header"><div class="card-title">Zusammenfassung</div></div>
+      <table class="fin-table">
+        <tr><th>Posten</th><th style="text-align:right">Betrag</th></tr>
+        <tr><td>Eigenkapital</td>
+            <td style="text-align:right">{{ "{:,.0f}".format(fin.eigenkapital|float) if fin.eigenkapital else '—' }} €</td></tr>
+        <tr><td>KfW {{ fin.kfw_program or '' }}</td>
+            <td style="text-align:right">{{ "{:,.0f}".format(fin.kfw_amount|float) if fin.kfw_amount else '—' }} €</td></tr>
+        <tr><td>Bankdarlehen</td>
+            <td style="text-align:right">{{ "{:,.0f}".format(fin.bank_loan_amount|float) if fin.bank_loan_amount else '—' }} €</td></tr>
+        <tr><td>Landesförderung</td>
+            <td style="text-align:right">{{ "{:,.0f}".format(fin.landesfoerderung_amount|float) if fin.landesfoerderung_amount else '—' }} €</td></tr>
+        <tr class="fin-total">
+          <td><strong>Gesamt</strong></td>
+          <td style="text-align:right"><strong>{{ "{:,.0f}".format(fin.total_financing()) }} €</strong></td>
+        </tr>
+        {% if fin.monthly_rate %}
+        <tr><td>Monatliche Rate</td>
+            <td style="text-align:right;color:var(--c-blue);font-weight:600">{{ "{:,.2f}".format(fin.monthly_rate|float) }} €</td></tr>
+        {% endif %}
+      </table>
+      {% if project.budget_total %}
+      <div class="mt-16 text-small">
+        {% set diff = fin.total_financing() - project.budget_total|float %}
+        {% if diff >= 0 %}
+        <span style="color:var(--c-green)">✓ Finanzierung deckt Budget (+ {{ "{:,.0f}".format(diff) }} €)</span>
+        {% else %}
+        <span style="color:var(--c-coral)">⚠ Lücke: {{ "{:,.0f}".format(diff|abs) }} € fehlen noch</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- KI Finanzierungsberatung -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">🤖 KfW-Beratung</div></div>
+      <button class="btn btn-primary w-full" data-label="KfW analysieren"
+        onclick="requestAiAction('kfw','{{ project.id }}','financing')">
+        KfW-Programme analysieren
+      </button>
+      <div class="ai-result-container mt-16"></div>
+      <div class="ai-chat-wrap mt-16">
+        <div class="ai-chat-body" id="ai-chat-body" style="height:220px;">
+          <div class="ai-msg ai-msg-bot">
+            Ich helfe bei der Finanzierungsplanung. Fragen zu KfW, WIBank Hessen oder Bankdarlehen?
+          </div>
+        </div>
+        <div class="ai-chat-footer">
+          <form id="ai-chat-form" class="flex gap-8 w-full">
+            <input type="text" id="ai-input" class="form-control ai-chat-input" placeholder="Frage zur Finanzierung...">
+            <button type="submit" class="btn btn-primary btn-sm">→</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>AiChat.init('{{ project.id }}', 'financing');</script>
+{% endblock %}

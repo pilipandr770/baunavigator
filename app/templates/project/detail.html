@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }} — BauNavigator{% endblock %}
+{% block content %}
+<span data-csrf="{{ csrf_token() }}"></span>
+
+<div class="page-header flex items-center gap-16">
+  <div>
+    <h1 class="page-title">{{ project.title }}</h1>
+    <p class="page-subtitle">
+      {{ project.address_city or '—' }} ·
+      {{ project_type_labels.get(project.project_type, project.project_type.value) }} ·
+      {{ project.grundstueck_m2 or '?' }} m² Grundstück ·
+      {{ project.wohnflaeche_m2 or '?' }} m² Wohnfläche
+    </p>
+  </div>
+  <div class="ml-auto flex gap-8">
+    <a href="{{ url_for('project.financing', project_id=project.id) }}" class="btn btn-secondary">Finanzierung</a>
+    <a href="{{ url_for('outbox.index') }}" class="btn btn-secondary">
+      Postausgang
+      {% if pending_messages %}<span style="background:var(--c-coral);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">{{ pending_messages }}</span>{% endif %}
+    </a>
+    <form method="post" action="{{ url_for('project.archive', project_id=project.id) }}"
+          onsubmit="return confirm('Projekt wirklich archivieren? Es wird aus der Übersicht ausgeblendet.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-secondary" style="color:var(--text-m);">Archivieren</button>
+    </form>
+  </div>
+</div>
+
+<!-- Progress bar -->
+{% set pct = project.completion_percent() %}
+<div class="card mb-16">
+  <div class="flex items-center gap-16">
+    <div style="flex:1">
+      <div class="flex items-center gap-8 mb-8">
+        <span style="font-size:13px;font-weight:500">Fortschritt</span>
+        <span class="badge badge-active">{{ pct }}% abgeschlossen</span>
+        <span class="text-small text-muted ml-auto">Aktuell: {{ stage_labels.get(project.current_stage, '') }}</span>
+      </div>
+      <div class="progress-bar-wrap" style="height:8px">
+        <div class="progress-bar" style="width:{{ pct }}%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2" style="grid-template-columns: 2fr 1fr; gap: 20px;">
+
+  <!-- Left: Stages -->
+  <div>
+    {% for phase in phases %}
+    <div class="phase-block">
+      <div class="phase-header" style="background: var(--c-{{ phase.color }}-l, var(--c-gray-l));">
+        <div class="phase-dot" style="background: var(--c-{{ phase.color }}, var(--c-gray));"></div>
+        <div class="phase-title">{{ phase.key }} — {{ phase.label }}</div>
+        <div class="phase-count text-muted">
+          {% set done = namespace(n=0) %}
+          {% for s in phase.stages %}{% if s.stage and s.stage.status.value == 'done' %}{% set done.n = done.n + 1 %}{% endif %}{% endfor %}
+          {{ done.n }}/{{ phase.stages|length }}
+        </div>
+      </div>
+
+      {% for s in phase.stages %}
+      {% set st = s.stage %}
+      {% set status = st.status.value if st else 'pending' %}
+      <div class="stage-row status-{{ status }}">
+        <div class="stage-status">
+          {% if status == 'done' %}✓{% elif status == 'active' %}→{% else %}○{% endif %}
+        </div>
+        <div class="stage-name">{{ s.label }}</div>
+        <div class="stage-actions">
+          {% if status in ('active', 'done') %}
+          <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=s.key.value) }}"
+             class="btn btn-sm btn-secondary">Öffnen</a>
+          {% endif %}
+          {% if status == 'active' %}
+          <form method="POST" action="{{ url_for('project.complete_stage', project_id=project.id, stage_key=s.key.value) }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-success">✓ Fertig</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Right: AI Chat -->
+  <div>
+    <div class="card" style="position:sticky;top:72px;">
+      <div class="card-header">
+        <div class="card-title">🤖 KI-Assistent</div>
+        <div class="card-subtitle">Für Projekt: {{ project.title }}</div>
+      </div>
+
+      <!-- Quick actions -->
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+        <button class="btn btn-secondary btn-sm" data-label="Zone analysieren"
+          onclick="requestAiAction('zone', '{{ project.id }}', '{{ project.current_stage.value }}')">
+          Zone analysieren
+        </button>
+        <button class="btn btn-secondary btn-sm" data-label="KfW berechnen"
+          onclick="requestAiAction('kfw', '{{ project.id }}', '{{ project.current_stage.value }}')">
+          KfW-Förderung berechnen
+        </button>
+        <button class="btn btn-secondary btn-sm" data-label="Checkliste erstellen"
+          onclick="requestAiAction('checklist', '{{ project.id }}', '{{ project.current_stage.value }}')">
+          Checkliste für aktuellen Schritt
+        </button>
+        <button class="btn btn-secondary btn-sm" data-label="Brief an Bauamt"
+          onclick="requestAiAction('letter', '{{ project.id }}', '{{ project.current_stage.value }}')">
+          Brief an Bauamt vorbereiten
+        </button>
+        <button class="btn btn-secondary btn-sm" data-label="Fachleute suchen"
+          onclick="requestAiAction('providers', '{{ project.id }}', '{{ project.current_stage.value }}')">
+          Fachleute für diesen Schritt
+        </button>
+      </div>
+
+      <div class="ai-result-container"></div>
+
+      <!-- Full chat -->
+      <div class="ai-chat-wrap mt-16">
+        <div class="ai-chat-body" id="ai-chat-body" style="height:240px;">
+          <div class="ai-msg ai-msg-bot">
+            Ich begleite Ihr Projekt "{{ project.title }}". Was möchten Sie wissen oder womit soll ich helfen?
+          </div>
+        </div>
+        <div class="ai-chat-footer">
+          <form id="ai-chat-form" class="flex gap-8 w-full">
+            <input type="text" id="ai-input" class="form-control ai-chat-input"
+                   placeholder="Frage stellen...">
+            <button type="submit" class="btn btn-primary btn-sm">→</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+AiChat.init('{{ project.id }}', '{{ project.current_stage.value }}');
+</script>
+{% endblock %}

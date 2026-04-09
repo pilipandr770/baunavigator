@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Mein Profil — BauNavigator{% endblock %}
+{% block content %}
+<span data-csrf="{{ csrf_token() }}"></span>
+
+<div class="page-header flex items-center gap-16">
+  <div>
+    <h1 class="page-title">Mein Profil</h1>
+    <p class="page-subtitle">Kontoeinstellungen und Abonnement</p>
+  </div>
+  <div class="ml-auto">
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary">← Zurück</a>
+  </div>
+</div>
+
+<div class="grid-2" style="gap:20px;max-width:900px;">
+
+  <!-- Profildaten -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Persönliche Daten</div>
+    </div>
+    <form method="POST" action="{{ url_for('dashboard.profile') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="update_profile">
+      <div class="form-group">
+        <label class="form-label">Vollständiger Name</label>
+        <input type="text" name="full_name" class="form-control"
+               value="{{ current_user.full_name or '' }}" placeholder="Ihr Name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-Mail</label>
+        <input type="email" class="form-control" value="{{ current_user.email }}" disabled
+               style="background:var(--c-gray-l);color:var(--text-m);">
+        <div class="form-hint">E-Mail-Adresse kann nicht geändert werden</div>
+      </div>
+      <button type="submit" class="btn btn-primary">Speichern</button>
+    </form>
+  </div>
+
+  <!-- Abonnement -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Abonnement</div>
+    </div>
+    <div style="margin-bottom:16px;">
+      <div class="flex items-center gap-10 mb-8">
+        <span style="font-size:15px;font-weight:600;">Aktueller Plan:</span>
+        <span class="plan-badge plan-{{ current_user.subscription_tier.value }}">
+          {{ current_user.subscription_tier.value.upper() }}
+        </span>
+      </div>
+      {% if current_user.subscription %}
+      <div class="text-small text-muted">
+        Status: {{ current_user.subscription.status.value }}<br>
+        {% if current_user.subscription.current_period_end %}
+          Verlängert am: {{ current_user.subscription.current_period_end.strftime('%d.%m.%Y') }}
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <!-- FREE -->
+      <div class="plan-option {% if current_user.subscription_tier.value == 'free' %}plan-option-active{% endif %}">
+        <div class="flex items-center gap-8">
+          <span class="plan-badge plan-free">FREE</span>
+          <span style="font-size:13px;font-weight:500;">Kostenlos</span>
+          {% if current_user.subscription_tier.value == 'free' %}<span class="badge badge-done ml-auto">Aktiv</span>{% endif %}
+        </div>
+        <ul class="plan-features">
+          <li>1 Projekt</li>
+          <li>KI-Chat (begrenzt)</li>
+          <li>Alle 35 Bauphasen</li>
+        </ul>
+      </div>
+
+      <!-- PRO -->
+      <div class="plan-option {% if current_user.subscription_tier.value == 'pro' %}plan-option-active{% endif %}">
+        <div class="flex items-center gap-8">
+          <span class="plan-badge plan-pro">PRO</span>
+          <span style="font-size:13px;font-weight:500;">49 € / Monat</span>
+          {% if current_user.subscription_tier.value == 'pro' %}<span class="badge badge-done ml-auto">Aktiv</span>{% endif %}
+        </div>
+        <ul class="plan-features">
+          <li>Unbegrenzte Projekte</li>
+          <li>KI-Briefe an Bauamt</li>
+          <li>KfW-Analyse</li>
+          <li>Dokument-Entwürfe</li>
+        </ul>
+        {% if current_user.subscription_tier.value == 'free' %}
+        <a href="#" class="btn btn-primary btn-sm mt-8" style="pointer-events:none;opacity:.5;"
+           title="Stripe-Checkout kommt bald">Upgrade auf PRO</a>
+        {% endif %}
+      </div>
+
+      <!-- EXPERT -->
+      <div class="plan-option {% if current_user.subscription_tier.value == 'expert' %}plan-option-active{% endif %}">
+        <div class="flex items-center gap-8">
+          <span class="plan-badge plan-expert">EXPERT</span>
+          <span style="font-size:13px;font-weight:500;">129 € / Monat</span>
+          {% if current_user.subscription_tier.value == 'expert' %}<span class="badge badge-done ml-auto">Aktiv</span>{% endif %}
+        </div>
+        <ul class="plan-features">
+          <li>Alles aus PRO</li>
+          <li>Vorrang-Support</li>
+          <li>Gutachter-Zugang</li>
+          <li>Unbegrenzte KI-Anfragen</li>
+        </ul>
+        {% if current_user.subscription_tier.value in ('free','pro') %}
+        <a href="#" class="btn btn-secondary btn-sm mt-8" style="pointer-events:none;opacity:.5;"
+           title="Stripe-Checkout kommt bald">Upgrade auf EXPERT</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Passwort ändern -->
+<div class="card mt-20" style="max-width:440px;">
+  <div class="card-header">
+    <div class="card-title">Passwort ändern</div>
+  </div>
+  <form method="POST" action="{{ url_for('dashboard.profile') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="change_password">
+    <div class="form-group">
+      <label class="form-label">Aktuelles Passwort <span class="req">*</span></label>
+      <input type="password" name="current_password" class="form-control" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Neues Passwort <span class="req">*</span></label>
+      <input type="password" name="new_password" class="form-control" required minlength="8">
+      <div class="form-hint">Mindestens 8 Zeichen</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Passwort bestätigen <span class="req">*</span></label>
+      <input type="password" name="confirm_password" class="form-control" required minlength="8">
+    </div>
+    <button type="submit" class="btn btn-secondary">Passwort aktualisieren</button>
+  </form>
+</div>
+
+{% endblock %}

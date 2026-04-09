@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Meine Projekte — BauNavigator{% endblock %}
+{% block content %}
+<span data-csrf="{{ csrf_token() }}"></span>
+
+<div class="page-header flex items-center gap-16">
+  <div>
+    <h1 class="page-title">Meine Projekte</h1>
+    <p class="page-subtitle">Willkommen, {{ current_user.full_name or current_user.email }}</p>
+  </div>
+  <div class="ml-auto">
+    <a href="{{ url_for('project.new') }}" class="btn btn-primary">+ Neues Projekt</a>
+  </div>
+</div>
+
+{% if projects %}
+  <div class="grid-3">
+    {% for project in projects %}
+    <a href="{{ url_for('project.detail', project_id=project.id) }}" class="project-card">
+      <div class="project-card-title">{{ project.title }}</div>
+      <div class="project-card-meta">
+        {{ project.address_city or '—' }} ·
+        {{ project_type_labels.get(project.project_type, project.project_type.value) }} ·
+        {{ project.grundstueck_m2 or '?' }} m²
+      </div>
+      <div class="text-small text-muted mb-16">
+        Aktuell: <strong>{{ stage_labels.get(project.current_stage, project.current_stage) }}</strong>
+      </div>
+      {% set pct = project.completion_percent() %}
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" style="width:{{ pct }}%"></div>
+      </div>
+      <div class="progress-label">{{ pct }}% abgeschlossen</div>
+    </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card text-center" style="padding: 48px;">
+    <div style="font-size: 48px; margin-bottom: 16px;">🏗</div>
+    <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Noch kein Projekt</h2>
+    <p class="text-muted mb-16">Starten Sie Ihr erstes Bauprojekt und lassen Sie die KI Sie durch alle Schritte begleiten.</p>
+    <a href="{{ url_for('project.new') }}" class="btn btn-primary btn-lg">Projekt starten</a>
+  </div>
+{% endif %}
+
+<!-- Quick AI Chat -->
+<div class="card mt-24">
+  <div class="card-header">
+    <div class="card-title">KI-Assistent — Allgemeine Fragen</div>
+    <div class="card-subtitle">Stellen Sie eine Frage zum deutschen Baurecht, Finanzierung oder Bauablauf</div>
+  </div>
+  <div class="ai-chat-wrap">
+    <div class="ai-chat-body" id="ai-chat-body">
+      <div class="ai-msg ai-msg-bot">
+        Hallo! Ich bin Ihr BauNavigator-Assistent. Ich kenne das deutsche Baurecht (HBO Hessen), KfW-Förderprogramme und alle Gewerke. Was möchten Sie wissen?
+      </div>
+    </div>
+    <div class="ai-chat-footer">
+      <form id="ai-chat-form" class="flex gap-8 w-full">
+        <input type="text" id="ai-input" class="form-control ai-chat-input"
+               placeholder="Ihre Frage zum Bauen in Deutschland...">
+        <button type="submit" class="btn btn-primary">Fragen</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>AiChat.init(null, null);</script>
+{% endblock %}

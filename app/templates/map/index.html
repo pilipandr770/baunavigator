@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Karte Hessen — BauNavigator{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Karte — Gemeinden Hessen</h1>
+  <p class="page-subtitle">Klicken Sie auf eine Gemeinde um Bebauungsplan-Informationen zu sehen</p>
+</div>
+
+<div class="grid-2" style="grid-template-columns: 2fr 1fr; gap: 20px;">
+  <div>
+    <div id="map"></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" id="map-selected-name">Gemeinde auswählen</div>
+      <div class="card-subtitle" id="map-selected-kreis"></div>
+    </div>
+    <div id="map-info">
+      <p class="text-muted text-small">Klicken Sie auf eine Gemeinde auf der Karte oder wählen Sie aus der Liste.</p>
+      <div style="margin-top: 16px;">
+        <input type="text" id="gemeinde-search" class="form-control" placeholder="Gemeinde suchen...">
+        <div id="gemeinde-list" style="margin-top:8px;max-height:300px;overflow-y:auto;"></div>
+      </div>
+    </div>
+    <div id="zone-info" class="hidden" style="margin-top:16px;"></div>
+    <div id="map-actions" class="hidden" style="margin-top:16px;">
+      <button class="btn btn-primary w-full" id="btn-ai-zone">KI: Zone analysieren</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const map = initMap('map', { center: [50.65, 9.0], zoom: 8 });
+let selectedGemeinde = null;
+
+// Load gemeinden from API
+fetch('/map/api/gemeinden')
+  .then(r => r.json())
+  .then(data => {
+    const list = document.getElementById('gemeinde-list');
+    data.forEach(g => {
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:6px 8px;cursor:pointer;border-radius:4px;font-size:12px;';
+      div.textContent = `${g.name} (${g.landkreis || 'Hessen'})`;
+      div.addEventListener('mouseenter', () => div.style.background = 'var(--c-blue-l)');
+      div.addEventListener('mouseleave', () => div.style.background = '');
+      div.addEventListener('click', () => selectGemeinde(g));
+      list.appendChild(div);
+    });
+
+    // Search filter
+    document.getElementById('gemeinde-search').addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      list.querySelectorAll('div').forEach(d => {
+        d.style.display = d.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  });
+
+function selectGemeinde(g) {
+  selectedGemeinde = g;
+  document.getElementById('map-selected-name').textContent = g.name;
+  document.getElementById('map-selected-kreis').textContent = g.landkreis || 'Hessen';
+  document.getElementById('map-actions').classList.remove('hidden');
+
+  // Load zones
+  fetch(`/map/api/gemeinde/${g.id}/zones`)
+    .then(r => r.json())
+    .then(zones => {
+      const el = document.getElementById('zone-info');
+      el.classList.remove('hidden');
+      if (zones.length === 0) {
+        el.innerHTML = '<p class="text-small text-muted">Keine Bebauungsplan-Zonen in der Datenbank.</p>';
+        return;
+      }
+      el.innerHTML = `<div class="card-title text-small mb-8">Zonen (${zones.length})</div>` +
+        zones.map(z => `
+          <div style="padding:6px 8px;border-radius:4px;background:var(--c-gray-l);margin-bottom:4px;font-size:11px;">
+            <strong>${z.zone_type}</strong> — ${z.zone_label}<br>
+            GRZ: ${z.grz_max || '—'} · GFZ: ${z.gfz_max || '—'} · Max ${z.max_geschosse || '?'} Geschosse
+          </div>
+        `).join('');
+    });
+}
+
+document.getElementById('btn-ai-zone')?.addEventListener('click', () => {
+  if (!selectedGemeinde) return;
+  alert('Bitte zuerst ein Projekt öffnen und die Zone dort analysieren.');
+});
+</script>
+{% endblock %}

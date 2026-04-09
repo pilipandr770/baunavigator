@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Postausgang — BauNavigator{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Postausgang</h1>
+  <p class="page-subtitle">Alle von der KI vorbereiteten Nachrichten — prüfen und absenden</p>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+  <div class="outbox-row">
+    <div class="flex items-center gap-10 mb-8">
+      <div>
+        <div class="outbox-recipient">An: {{ msg.recipient_name or msg.recipient_email }}</div>
+        <div class="outbox-subject">{{ msg.subject }}</div>
+        <div class="text-small text-muted">
+          {{ msg.recipient_type.value }} · {{ msg.created_at.strftime('%d.%m.%Y %H:%M') }}
+          {% if msg.project %} · {{ msg.project.title }}{% endif %}
+        </div>
+      </div>
+      <div class="ml-auto">
+        <span class="badge badge-{{ msg.status.value }} ml-auto">
+        {% if msg.status.value == 'draft' %}Entwurf
+        {% elif msg.status.value == 'awaiting_approval' %}Zur Freigabe
+        {% elif msg.status.value == 'sent' %}Gesendet
+        {% elif msg.status.value == 'failed' %}Fehler
+        {% else %}{{ msg.status.value }}{% endif %}
+      </span>
+      </div>
+    </div>
+
+    {% if msg.status.value in ('draft', 'awaiting_approval') %}
+    <!-- Preview -->
+    <details style="margin-bottom:10px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--c-blue);">Nachrichtentext anzeigen</summary>
+      <div style="background:var(--c-gray-l);padding:12px;border-radius:var(--radius);margin-top:8px;
+                  font-size:12px;white-space:pre-wrap;line-height:1.6;">{{ msg.body_draft }}</div>
+    </details>
+
+    <div class="outbox-actions">
+      <form method="POST" action="{{ url_for('outbox.approve', message_id=msg.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success btn-sm">✓ Absenden</button>
+      </form>
+      <button class="btn btn-secondary btn-sm" onclick="toggleEdit('{{ msg.id }}')">Bearbeiten</button>
+      <form method="POST" action="{{ url_for('outbox.delete', message_id=msg.id) }}"
+            onsubmit="return confirm('Löschen?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-secondary btn-sm" style="color:var(--c-coral)">Löschen</button>
+      </form>
+    </div>
+
+    <!-- Edit form (hidden by default) -->
+    <div id="edit-{{ msg.id }}" class="hidden" style="margin-top:12px;">
+      <form method="POST" action="{{ url_for('outbox.edit', message_id=msg.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label class="form-label">Betreff</label>
+          <input type="text" name="subject" class="form-control" value="{{ msg.subject }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nachrichtentext</label>
+          <textarea name="body_draft" class="form-control" rows="8">{{ msg.body_draft }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Speichern</button>
+      </form>
+    </div>
+
+    {% elif msg.status.value == 'sent' %}
+    <div class="text-small" style="color:var(--c-green)">
+      ✓ Gesendet am {{ msg.sent_at.strftime('%d.%m.%Y %H:%M') if msg.sent_at else '—' }}
+    </div>
+    {% elif msg.status.value == 'failed' %}
+    <div class="text-small" style="color:var(--c-coral)">
+      ✗ Fehler: {{ msg.error_log or 'Unbekannter Fehler' }}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card text-center" style="padding:48px;">
+    <div style="font-size:40px;margin-bottom:12px;">📭</div>
+    <p class="text-muted">Keine Nachrichten im Postausgang.</p>
+    <p class="text-small text-muted mt-8">Die KI bereitet Nachrichten automatisch vor, wenn Sie einen Schritt öffnen.</p>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleEdit(id) {
+  const el = document.getElementById('edit-' + id);
+  el.classList.toggle('hidden');
+}
+</script>
+{% endblock %}

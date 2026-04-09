@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}{{ stage_label }} — {{ project.title }}{% endblock %}
+{% block content %}
+<span data-csrf="{{ csrf_token() }}"></span>
+
+<div class="page-header">
+  <div class="text-small text-muted mb-8">
+    <a href="{{ url_for('project.detail', project_id=project.id) }}">{{ project.title }}</a> →
+  </div>
+  <div class="flex items-center gap-16">
+    <h1 class="page-title">{{ stage_label }}</h1>
+    <span class="badge badge-{{ stage.status.value }}">
+      {% if stage.status.value == 'active' %}Aktiv
+      {% elif stage.status.value == 'done' %}Abgeschlossen
+      {% else %}Ausstehend{% endif %}
+    </span>
+    <div class="ml-auto flex gap-8">
+      {% if stage.status.value == 'active' %}
+      <form method="POST" action="{{ url_for('project.complete_stage', project_id=project.id, stage_key=stage.stage_key.value) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success">✓ Schritt abschließen</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid-2" style="grid-template-columns: 3fr 2fr; gap: 20px;">
+
+  <!-- Left column -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Checklist -->
+    {% if stage.checklist %}
+    <div class="card" id="checklist-card">
+      <div class="card-header flex items-center gap-8">
+        <div class="card-title">Checkliste</div>
+        {% set done_items = stage.checklist | selectattr('done') | list %}
+        <span class="badge badge-active ml-auto">{{ done_items|length }}/{{ stage.checklist|length }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        {% for item in stage.checklist %}
+        <label class="checklist-item {% if item.done %}checklist-item-done{% endif %}"
+               data-index="{{ loop.index0 }}">
+          <input type="checkbox" class="checklist-checkbox"
+                 {% if item.done %}checked{% endif %}
+                 onchange="toggleChecklist('{{ project.id }}','{{ stage.stage_key.value }}',{{ loop.index0 }},this.checked)">
+          <span style="flex:1;">{{ item.item }}</span>
+          {% if item.required %}<span class="badge badge-draft" style="font-size:9px;">Pflicht</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Documents -->
+    <div class="card">
+      <div class="card-header flex items-center gap-8">
+        <div class="card-title">Dokumente</div>
+        <span class="badge badge-active ml-auto">{{ documents|length }}</span>
+        <button class="btn btn-sm btn-secondary" onclick="toggleUploadForm()" style="margin-left:8px;">
+          + Hochladen
+        </button>
+      </div>
+
+      <!-- Upload form -->
+      <div id="upload-form" class="hidden" style="margin-bottom:12px;padding:12px;background:var(--c-gray-l);border-radius:var(--radius);">
+        <form method="POST" enctype="multipart/form-data"
+              action="{{ url_for('project.upload_document', project_id=project.id, stage_key=stage.stage_key.value) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="form-row" style="margin-bottom:8px;">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Datei <span class="req">*</span></label>
+              <input type="file" name="file" class="form-control" required accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Dokumenttyp</label>
+              <select name="doc_type" class="form-control">
+                {% for dt in doc_types %}
+                <option value="{{ dt.value }}">{{ doc_type_labels.get(dt, dt.value) }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">Beschreibung</label>
+            <input type="text" name="description" class="form-control" placeholder="Optional">
+          </div>
+          <div class="flex gap-8">
+            <button type="submit" class="btn btn-primary btn-sm">Speichern</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleUploadForm()">Abbrechen</button>
+          </div>
+        </form>
+      </div>
+
+      {% if documents %}
+        {% for doc in documents %}
+        <div class="flex items-center gap-10" style="padding:8px 0;border-bottom:1px solid var(--border);">
+          <div style="font-size:20px;">
+            {% if doc.mime_type and 'pdf' in doc.mime_type %}📄
+            {% elif doc.mime_type and 'image' in doc.mime_type %}🖼
+            {% else %}📎{% endif %}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500">{{ doc.original_filename or doc.filename }}</div>
+            <div class="text-small text-muted">
+              {{ doc_type_labels.get(doc.doc_type, doc.doc_type.value) }} ·
+              {{ doc.uploaded_at.strftime('%d.%m.%Y') }}
+              {% if doc.size_bytes %} · {{ (doc.size_bytes / 1024)|int }} KB{% endif %}
+            </div>
+          </div>
+          {% if doc.generated_by_ai %}
+          <span class="badge badge-active">KI-Entwurf</span>
+          {% endif %}
+          <a href="{{ url_for('project.download_document', doc_id=doc.id) }}"
+             class="btn btn-sm btn-secondary">↓</a>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted text-small">Noch keine Dokumente in diesem Schritt.</p>
+      {% endif %}
+    </div>
+
+    <!-- Outbox messages -->
+    {% if outbox %}
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Geplante Nachrichten</div>
+      </div>
+      {% for msg in outbox %}
+      <div class="outbox-row">
+        <div class="flex items-center gap-8">
+          <div class="outbox-recipient">An: {{ msg.recipient_name or msg.recipient_email }}</div>
+          <span class="badge badge-{{ msg.status.value }} ml-auto">
+            {% if msg.status.value == 'draft' %}Entwurf
+            {% elif msg.status.value == 'awaiting_approval' %}Zur Freigabe
+            {% elif msg.status.value == 'sent' %}Gesendet
+            {% elif msg.status.value == 'failed' %}Fehler
+            {% else %}{{ msg.status.value }}{% endif %}
+          </span>
+        </div>
+        <div class="outbox-subject">{{ msg.subject }}</div>
+        {% if msg.status.value == 'draft' %}
+        <div class="outbox-actions">
+          <form method="POST" action="{{ url_for('outbox.approve', message_id=msg.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-success">Absenden</button>
+          </form>
+          <a href="{{ url_for('outbox.index') }}" class="btn btn-sm btn-secondary">Bearbeiten</a>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Notes -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Notizen</div></div>
+      <form method="POST" action="{{ url_for('project.save_notes', project_id=project.id, stage_key=stage.stage_key.value) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <textarea name="notes" class="form-control" rows="4"
+                  style="resize:vertical;margin-bottom:10px;"
+                  placeholder="Ihre persönlichen Notizen zu diesem Bauschritt…">{{ stage.notes or '' }}</textarea>
+        <button type="submit" class="btn btn-secondary btn-sm">Speichern</button>
+      </form>
+    </div>
+
+    <!-- AI result area -->
+    <div class="ai-result-container"></div>
+
+  </div>
+
+  <!-- Right column: AI -->
+  <div>
+    <div class="card" style="position:sticky;top:72px;">
+      <div class="card-header">
+        <div class="card-title">🤖 KI für diesen Schritt</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+        <button class="btn btn-secondary btn-sm" data-label="Checkliste"
+          onclick="requestAiAction('checklist','{{ project.id }}','{{ stage.stage_key.value }}')">
+          Checkliste erstellen
+        </button>
+        <button class="btn btn-secondary btn-sm" data-label="Brief vorbereiten"
+          onclick="requestAiAction('letter','{{ project.id }}','{{ stage.stage_key.value }}')">
+          Brief an Behörde vorbereiten
+        </button>
+        <button class="btn btn-secondary btn-sm" data-label="Fachleute finden"
+          onclick="requestAiAction('providers','{{ project.id }}','{{ stage.stage_key.value }}')">
+          Fachleute finden
+        </button>
+      </div>
+
+      <div class="ai-chat-wrap">
+        <div class="ai-chat-header">
+          <span>KI-Assistent</span>
+          <span style="font-size:11px;opacity:.8;margin-left:auto;">{{ stage_label }}</span>
+        </div>
+        <div class="ai-chat-body" id="ai-chat-body" style="height:300px;">
+          <div class="ai-msg ai-msg-bot">
+            Ich helfe Ihnen mit dem Schritt „{{ stage_label }}". Was brauchen Sie?
+          </div>
+        </div>
+        <div class="ai-chat-footer">
+          <form id="ai-chat-form" class="flex gap-8 w-full">
+            <input type="text" id="ai-input" class="form-control ai-chat-input" placeholder="Frage stellen...">
+            <button type="submit" class="btn btn-primary btn-sm">→</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+AiChat.init('{{ project.id }}', '{{ stage.stage_key.value }}');
+
+function toggleUploadForm() {
+  document.getElementById('upload-form').classList.toggle('hidden');
+}
+
+async function toggleChecklist(projectId, stageKey, index, done) {
+  const label = document.querySelector(`[data-index="${index}"]`);
+  if (label) label.classList.toggle('checklist-item-done', done);
+
+  try {
+    await fetch(`/project/${projectId}/stage/${stageKey}/checklist/${index}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ done }),
+    });
+  } catch(e) {
+    showToast('Fehler beim Speichern', 'danger');
+  }
+}
+</script>
+{% endblock %}

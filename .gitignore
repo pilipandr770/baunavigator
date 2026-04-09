@@ -1,0 +1,59 @@
+# ─── Python ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+pip-wheel-metadata/
+
+# ─── Virtual environments ─────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+.env.bak
+
+# ─── Environment / secrets ────────────────────────────
+.env
+*.env
+.env.local
+.env.*.local
+
+# ─── Flask / instance ─────────────────────────────────
+instance/
+*.db
+*.sqlite3
+
+# ─── Uploads (user files) ─────────────────────────────
+instance/uploads/
+
+# ─── Flask-Migrate compiled ───────────────────────────
+migrations/versions/__pycache__/
+
+# ─── Testing ──────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ─── IDE / editors ────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Logs ─────────────────────────────────────────────
+*.log
+logs/
+
+# ─── OS ───────────────────────────────────────────────
+desktop.ini

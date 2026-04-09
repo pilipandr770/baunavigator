@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Fachleute — BauNavigator{% endblock %}
+{% block content %}
+<div class="page-header flex items-center gap-16">
+  <div>
+    <h1 class="page-title">Geprüfte Fachleute</h1>
+    <p class="page-subtitle">Alle Anbieter mit verifizierten Lizenzen und Meisterbrief</p>
+  </div>
+  <div class="ml-auto">
+    <a href="{{ url_for('providers.register_provider') }}" class="btn btn-secondary">Als Anbieter registrieren</a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-16">
+  <form method="GET" class="flex gap-8 items-center flex-wrap">
+    <select name="category" class="form-control" style="width:auto;min-width:200px;">
+      <option value="">Alle Kategorien</option>
+      {% for cat in categories %}
+      <option value="{{ cat.value }}" {{ 'selected' if selected_category == cat.value }}>
+        {{ category_labels.get(cat, cat.value) }}
+      </option>
+      {% endfor %}
+    </select>
+    <input type="text" name="plz" class="form-control" style="width:120px;"
+           placeholder="PLZ" value="{{ selected_plz or '' }}" maxlength="5">
+    <button type="submit" class="btn btn-primary">Suchen</button>
+    {% if selected_category or selected_plz %}
+    <a href="{{ url_for('providers.index') }}" class="btn btn-secondary">Zurücksetzen</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if providers %}
+<div class="grid-3">
+  {% for p in providers %}
+  <div class="provider-card">
+    <div class="provider-name">{{ p.company_name }}</div>
+    <div class="provider-rating">
+      <span class="stars">{% for i in range(p.rating_avg|int) %}★{% endfor %}</span>
+      <span>{{ "%.1f"|format(p.rating_avg|float) }} ({{ p.review_count }})</span>
+    </div>
+    <div class="text-small text-muted">{{ p.legal_form or '' }}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+      {% for svc in p.services.limit(3) %}
+      <span class="badge badge-active" style="font-size:10px;">{{ svc.category.value.replace('_',' ') }}</span>
+      {% endfor %}
+    </div>
+    <div class="flex gap-8 mt-16">
+      <a href="{{ url_for('providers.detail', provider_id=p.id) }}"
+         class="btn btn-secondary btn-sm">Profil ansehen</a>
+      <a href="mailto:{{ p.contact_email }}" class="btn btn-primary btn-sm">Kontaktieren</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card text-center" style="padding:48px;">
+  <div style="font-size:40px;margin-bottom:12px;">🔍</div>
+  <p class="text-muted">Keine Anbieter gefunden. Versuchen Sie eine andere Kategorie.</p>
+</div>
+{% endif %}
+{% endblock %}

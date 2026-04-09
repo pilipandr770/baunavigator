@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}{{ provider.company_name }} — BauNavigator{% endblock %}
+{% block content %}
+<div class="page-header flex items-center gap-16">
+  <div>
+    <h1 class="page-title">{{ provider.company_name }}</h1>
+    <div class="flex items-center gap-10 mt-8">
+      <div class="provider-rating">
+        <span class="stars">{% for i in range(provider.rating_avg|int) %}★{% endfor %}</span>
+        <span>{{ "%.1f"|format(provider.rating_avg|float) }} ({{ provider.review_count }} Bewertungen)</span>
+      </div>
+      <span class="badge badge-done">✓ Verifiziert</span>
+      {% if provider.subscription_plan.value == 'premium' %}
+      <span class="badge" style="background:var(--c-purple-l);color:var(--c-purple);">Premium</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="ml-auto">
+    <a href="mailto:{{ provider.contact_email }}" class="btn btn-primary">Kontakt aufnehmen</a>
+  </div>
+</div>
+
+<div class="grid-2" style="gap:20px;">
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Info -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Unternehmensinformationen</div></div>
+      <table style="width:100%;font-size:13px;border-collapse:collapse;">
+        <tr><td style="padding:8px 0;color:var(--text-m);width:40%">Rechtsform</td>
+            <td>{{ provider.legal_form or '—' }}</td></tr>
+        <tr><td style="padding:8px 0;color:var(--text-m)">USt-IdNr.</td>
+            <td>{{ provider.vat_id or '—' }}
+            {% if provider.vat_verified %}<span class="badge badge-done" style="font-size:10px;margin-left:4px;">✓ VIES geprüft</span>{% endif %}</td></tr>
+        <tr><td style="padding:8px 0;color:var(--text-m)">Handelsregister</td>
+            <td>{{ provider.handelsreg_nr or '—' }}</td></tr>
+        <tr><td style="padding:8px 0;color:var(--text-m)">Website</td>
+            <td>{% if provider.website %}<a href="{{ provider.website }}" target="_blank">{{ provider.website }}</a>{% else %}—{% endif %}</td></tr>
+        <tr><td style="padding:8px 0;color:var(--text-m)">Telefon</td>
+            <td>{{ provider.contact_phone or '—' }}</td></tr>
+      </table>
+    </div>
+
+    <!-- Services -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Leistungen</div></div>
+      {% for svc in provider.services %}
+      <div style="padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="font-weight:500;font-size:13px;">{{ category_labels.get(svc.category, svc.category.value) }}</div>
+        {% if svc.subcategory %}<div class="text-small text-muted">{{ svc.subcategory }}</div>{% endif %}
+        {% if svc.price_range_min %}
+        <div class="text-small" style="color:var(--c-blue);margin-top:2px;">
+          {{ "{:,.0f}".format(svc.price_range_min|float) }}–{{ "{:,.0f}".format(svc.price_range_max|float) }} €
+          {% if svc.price_unit %}/{{ svc.price_unit }}{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Licenses -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Zulassungen & Zertifikate</div></div>
+      {% for lic in provider.licenses %}
+      <div style="padding:8px 0;border-bottom:1px solid var(--border);">
+        <div class="flex items-center gap-8">
+          <span style="font-size:13px;font-weight:500;">{{ lic.license_type.value.replace('_',' ').title() }}</span>
+          {% if lic.is_expired() %}
+          <span class="badge badge-failed">Abgelaufen</span>
+          {% else %}
+          <span class="badge badge-done">Gültig</span>
+          {% endif %}
+        </div>
+        <div class="text-small text-muted">{{ lic.issuing_body or '' }}
+          {% if lic.valid_until %} · bis {{ lic.valid_until.strftime('%d.%m.%Y') }}{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Reviews -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Bewertungen</div></div>
+    {% if reviews %}
+      {% for r in reviews %}
+      <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+        <div class="flex items-center gap-8 mb-4">
+          <span class="stars">{% for i in range(r.rating) %}★{% endfor %}</span>
+          {% if r.verified_deal %}<span class="badge badge-done" style="font-size:10px;">✓ Verifiziert</span>{% endif %}
+          <span class="text-small text-muted ml-auto">{{ r.created_at.strftime('%d.%m.%Y') }}</span>
+        </div>
+        {% if r.title %}<div style="font-weight:500;font-size:13px;">{{ r.title }}</div>{% endif %}
+        {% if r.text %}<div style="font-size:12px;color:var(--text-m);margin-top:4px;">{{ r.text }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-muted text-small">Noch keine Bewertungen.</p>
+    {% endif %}
+    {% if provider.description %}
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <div class="card-subtitle mb-8">Über uns</div>
+      <p style="font-size:13px;line-height:1.6;">{{ provider.description }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Submit Review -->
+  {% if current_user.is_authenticated %}
+  <div class="card">
+    <div class="card-header"><div class="card-title">Bewertung schreiben</div></div>
+    <form method="post" action="{{ url_for('providers.submit_review', provider_id=provider.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Sternebewertung <span style="color:var(--c-red)">*</span></label>
+        <div class="flex gap-8" style="font-size:22px;">
+          {% for i in range(1,6) %}
+          <label style="cursor:pointer;">
+            <input type="radio" name="rating" value="{{ i }}" required style="display:none;" class="star-radio">
+            <span class="star-label" data-val="{{ i }}" style="color:var(--border);transition:color .15s;">★</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Titel (optional)</label>
+        <input type="text" name="title" class="form-control" maxlength="255" placeholder="Kurze Überschrift…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Erfahrungsbericht (optional)</label>
+        <textarea name="text" class="form-control" rows="4" placeholder="Beschreiben Sie Ihre Erfahrung…"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Bewertung absenden</button>
+    </form>
+  </div>
+  {% endif %}
+  </div>
+</div>
+
+<script>
+// Star rating highlight
+const labels = document.querySelectorAll('.star-label');
+const radios = document.querySelectorAll('.star-radio');
+labels.forEach((lbl, idx) => {
+  lbl.addEventListener('mouseover', () => {
+    labels.forEach((l, i) => l.style.color = i <= idx ? 'var(--c-yellow, #f59e0b)' : 'var(--border)');
+  });
+  lbl.addEventListener('mouseout', () => updateStars());
+  lbl.addEventListener('click', () => { radios[idx].checked = true; updateStars(); });
+});
+function updateStars() {
+  const checked = [...radios].findIndex(r => r.checked);
+  labels.forEach((l, i) => l.style.color = i <= checked ? 'var(--c-yellow, #f59e0b)' : 'var(--border)');
+}
+</script>
+{% endblock %}
