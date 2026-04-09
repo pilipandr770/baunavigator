@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Tarif wählen — BauNavigator{% endblock %}
+{% block content %}
+<div class="page-header" style="text-align:center;padding-bottom:8px;">
+  <h1 class="page-title">Tarif wählen</h1>
+  <p class="page-subtitle">Wählen Sie den passenden Plan für Ihr Bauprojekt</p>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;max-width:900px;margin:0 auto;">
+
+  <!-- FREE -->
+  <div class="card" style="border:2px solid var(--border);">
+    <div style="text-align:center;padding:8px 0 16px;">
+      <div style="font-size:13px;font-weight:600;color:var(--text-m);text-transform:uppercase;letter-spacing:1px;">Free</div>
+      <div style="font-size:36px;font-weight:700;margin:8px 0;">0 €</div>
+      <div class="text-small text-muted">pro Monat</div>
+    </div>
+    <ul style="list-style:none;padding:0;margin:0 0 20px;font-size:13px;display:flex;flex-direction:column;gap:8px;">
+      <li>✓ 1 Bauprojekt</li>
+      <li>✓ 35 Bauphasen-Tracker</li>
+      <li>✓ KI-Assistent (10 Anfragen/Monat)</li>
+      <li>✓ Checklisten &amp; Dokumente</li>
+      <li style="color:var(--text-m)">✗ Unbegrenzte KI-Anfragen</li>
+      <li style="color:var(--text-m)">✗ Brief-Generator</li>
+      <li style="color:var(--text-m)">✗ Mehrere Projekte</li>
+    </ul>
+    {% if current_user.subscription_tier.value == 'free' %}
+    <button class="btn btn-secondary w-full" disabled>Aktueller Plan</button>
+    {% else %}
+    <div class="text-center text-small text-muted">Kostenloses Grundpaket</div>
+    {% endif %}
+  </div>
+
+  <!-- PRO -->
+  <div class="card" style="border:2px solid var(--c-blue);position:relative;">
+    <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+                background:var(--c-blue);color:#fff;padding:3px 14px;border-radius:20px;font-size:11px;font-weight:600;">
+      EMPFOHLEN
+    </div>
+    <div style="text-align:center;padding:8px 0 16px;">
+      <div style="font-size:13px;font-weight:600;color:var(--c-blue);text-transform:uppercase;letter-spacing:1px;">Pro</div>
+      <div style="font-size:36px;font-weight:700;margin:8px 0;">29 €</div>
+      <div class="text-small text-muted">pro Monat</div>
+    </div>
+    <ul style="list-style:none;padding:0;margin:0 0 20px;font-size:13px;display:flex;flex-direction:column;gap:8px;">
+      <li>✓ 3 Bauprojekte</li>
+      <li>✓ Unbegrenzte KI-Anfragen</li>
+      <li>✓ Brief-Generator (Bauamt, KfW)</li>
+      <li>✓ Dokument-Upload unbegrenzt</li>
+      <li>✓ Provideranfragen (5/Monat)</li>
+      <li>✓ Deadline-Erinnerungen per E-Mail</li>
+      <li style="color:var(--text-m)">✗ Prioritäts-Support</li>
+    </ul>
+    {% if current_user.subscription_tier.value == 'pro' %}
+    <button class="btn btn-primary w-full" disabled>Aktueller Plan</button>
+    {% else %}
+    <form method="post" action="{{ url_for('dashboard.create_checkout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="plan" value="pro">
+      <button type="submit" class="btn btn-primary" style="width:100%;">Pro wählen</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- EXPERT -->
+  <div class="card" style="border:2px solid var(--c-purple,#7c3aed);">
+    <div style="text-align:center;padding:8px 0 16px;">
+      <div style="font-size:13px;font-weight:600;color:var(--c-purple,#7c3aed);text-transform:uppercase;letter-spacing:1px;">Expert</div>
+      <div style="font-size:36px;font-weight:700;margin:8px 0;">79 €</div>
+      <div class="text-small text-muted">pro Monat</div>
+    </div>
+    <ul style="list-style:none;padding:0;margin:0 0 20px;font-size:13px;display:flex;flex-direction:column;gap:8px;">
+      <li>✓ Unbegrenzte Projekte</li>
+      <li>✓ Alles aus Pro</li>
+      <li>✓ Unbegrenzte Provideranfragen</li>
+      <li>✓ Tilgungsplan-Generator (PDF)</li>
+      <li>✓ Mehrbenutzer-Zugang (Architekt)</li>
+      <li>✓ Prioritäts-Support (24h)</li>
+      <li>✓ API-Zugang (Beta)</li>
+    </ul>
+    {% if current_user.subscription_tier.value == 'expert' %}
+    <button class="btn" style="width:100%;background:var(--c-purple,#7c3aed);color:#fff;" disabled>Aktueller Plan</button>
+    {% else %}
+    <form method="post" action="{{ url_for('dashboard.create_checkout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="plan" value="expert">
+      <button type="submit" class="btn" style="width:100%;background:var(--c-purple,#7c3aed);color:#fff;">Expert wählen</button>
+    </form>
+    {% endif %}
+  </div>
+
+</div>
+
+<div style="text-align:center;margin-top:24px;max-width:600px;margin-left:auto;margin-right:auto;">
+  <p class="text-small text-muted">
+    Zahlung sicher über Stripe. Monatlich kündbar. Alle Preise inkl. 19% MwSt.
+    Bei Fragen: <a href="mailto:support@baunavigator.de">support@baunavigator.de</a>
+  </p>
+</div>
+{% endblock %}

@@ -156,6 +156,11 @@ function showResult(text, mode) {
       </div>
     </div>
     <div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${escapeHtml(text)}</div>
+    <div style="margin-top:12px;padding:8px 12px;background:var(--c-gray-l);border-radius:6px;font-size:11px;color:var(--text-m);border-left:3px solid var(--c-yellow,#f59e0b);">
+      ⚠️ <strong>Rechtlicher Hinweis:</strong> Diese KI-Auskunft ersetzt keine Rechts-, Steuer- oder Fachberatung. 
+      Alle Angaben ohne Gewähr. Für verbindliche Entscheidungen konsultieren Sie bitte 
+      einen zugelassenen Architekten, Fachanwalt oder zuständigen Behördenvertreter.
+    </div>
   `;
 }
 

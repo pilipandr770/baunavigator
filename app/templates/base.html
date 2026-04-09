@@ -42,6 +42,9 @@
       <span class="plan-badge plan-{{ current_user.subscription_tier.value }}">
         {{ current_user.subscription_tier.value.upper() }}
       </span>
+      {% if current_user.subscription_tier.value == 'free' %}
+      <a href="{{ url_for('dashboard.upgrade') }}" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 10px;">Upgrade</a>
+      {% endif %}
       <a href="{{ url_for('auth.logout') }}" class="nav-link">Abmelden</a>
     </div>
   </div>
@@ -58,6 +61,13 @@
       </div>
     {% endif %}
   {% endwith %}
+
+  {% if current_user.is_authenticated and not current_user.email_confirmed %}
+  <div class="flash flash-warning" style="border-radius:0;margin-bottom:0;">
+    ⚠️ Ihre E-Mail-Adresse ist noch nicht bestätigt.
+    <a href="{{ url_for('auth.resend_confirmation') }}" style="color:inherit;font-weight:600;text-decoration:underline;margin-left:8px;">Bestätigungs-E-Mail erneut senden →</a>
+  </div>
+  {% endif %}
 
   {% block content %}{% endblock %}
 </div>

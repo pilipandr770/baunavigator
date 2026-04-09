@@ -89,6 +89,480 @@ Anmeldung: Bundesnetzagentur Marktstammdatenregister, lokaler Netzbetreiber.
 Förderung: KfW-270 Erneuerbare Energien Standard.
 Einspeisevergütung: EEG 2023 — aktuell prüfen auf bundesnetzagentur.de.
 """,
+
+    # ── Phase A (Grundstück & Planung) ─────────────────────────────────────────
+    StageKey.LAND_CHECK: """
+Kontext: Grundstücksüberprüfung vor dem Kauf.
+Wichtige Prüfungen:
+- Bodengutachten (Baugrunduntersuchung) — besonders in Hessen bei Hanglage
+- Altlastenkataster prüfen (online: Hessisches Landesamt für Naturschutz, Umwelt und Geologie)
+- Erschließungszustand: Wasser, Abwasser, Strom, Gas, Internet (Glasfaser?)
+- Leitungsauskunft: DSK/ENNI/lokale Versorger — 0800-Leitungsauskunft
+- Flachennutzungsplan vs. aktueller Bebauungsplan (Gemeinde-Website oder bauleitplanung.hessen.de)
+- Grundbuchauszug: Lasten, Dienstbarkeiten, Wegerechte (Grundbuchamt, €10)
+- Naturschutz: FFH-Gebiete, Überschwemmungszonen (HWRM-Karte Hessen)
+Tipp: Bodengutachten kostet ~1.500–3.000 €, spart aber teure Überraschungen beim Fundament.
+""",
+    StageKey.LAND_PURCHASE: """
+Kontext: Notarieller Grundstückskauf.
+Pflicht: Notar erforderlich (§311b BGB) — ohne Notar kein wirksamer Kaufvertrag.
+Ablauf:
+1. Kaufvertragsentwurf vom Notar prüfen (alle Lasten, Erschließungskosten, Rücktrittsrechte)
+2. Finanzierungsbestätigung der Bank vorlegen
+3. Beurkundungstermin beim Notar
+4. Grunderwerbsteuer Hessen: 6% des Kaufpreises (zahlbar binnen 4 Wochen)
+5. Eintragung ins Grundbuch (Auflassungsvormerkung → ~4–8 Wochen)
+Kosten: Notar ~1,5% + Grundbuch ~0,5% + Grunderwerbsteuer 6% = ~8% Nebenkosten.
+Checkliste: Personalausweis, Finanzierungsbestätigung, Klärung aller im Kaufvertrag offenen Punkte.
+""",
+
+    # ── Phase B (Planung & Genehmigung) ───────────────────────────────────────
+    StageKey.ARCHITECT_SELECT: """
+Kontext: Auswahl eines Architekten in Hessen.
+Pflicht: Entwurfsverfasser mit Eintragung in Architektenkammer Hessen (ArchG Hessen §1).
+Bei Bauvorhaben > 50 m² Wohnfläche: Bauvorlageberechtigung erforderlich.
+Suche: Architektenkammer Hessen (akh.de) — Kammermitglieder-Suche nach PLZ.
+Honorar: HOAI-Honorarordnung — bei 300.000 € Baukosten ca. 25.000–40.000 € (LP 1–9).
+Leistungsphasen (LP):
+  LP 1: Grundlagenermittlung | LP 2: Vorplanung | LP 3: Entwurfsplanung
+  LP 4: Genehmigungsplanung | LP 5: Ausführungsplanung
+  LP 6-8: Ausschreibung, Vergabe, Bauleitung | LP 9: Objektbetreuung
+Empfehle: Verträge mit HOAI-Vergütung + Stichprobenkontrolle auf der Baustelle vereinbaren.
+""",
+    StageKey.DESIGN_PLANNING: """
+Kontext: Entwurfs- und Genehmigungsplanung.
+Grundlagen HBO Hessen:
+- §6 HBO: Abstandsflächen — mind. 3 m zur Grundstücksgrenze (Regelfall)
+- §8 HBO: Dachaufbauten, Garagen, Nebenanlagen
+- §15 HBO: Barrierefreiheit (bei >2 Wohnungen Aufzugspflicht ab 4 Geschosse)
+Planungsunterlagen (§64 HBO):
+- Lageplan M 1:500 (Katasteramt, amtlich)
+- Grundrisse, Schnitte, Ansichten M 1:100
+- Baubeschreibung nach §59 HBO
+- Wohnflächenberechnung (WoFlV)
+- Entwässerungsplan (Untere Wasserbehörde)
+- Energieausweis-Vorberechnung (GEG-Nachweis)
+Tipp: GFZ und GRZ jetzt prüfen — Fehler hier stoppen die Baugenehmigung.
+""",
+    StageKey.TENDERING: """
+Kontext: Ausschreibung und Vergabe der Bauleistungen.
+Grundlagen: VOB/A (Verdingungsordnung für Bauleistungen) — bei privaten Projekten nicht zwingend, aber empfohlen.
+Ablauf:
+1. Leistungsverzeichnis (LV) vom Architekten/Planer erstellen lassen
+2. Mind. 3 Angebote je Gewerk einholen (Vergleichbarkeit)
+3. Submission: alle Angebote bis gleichen Termin
+4. Angebotsprüfung: Preis, Referenzen, Versicherungsnachweis (Haftpflichtversicherung!)
+5. Vergabevermerk anlegen
+Achtung: Billigstbieter ≠ Bestbieter — Qualifikation und Referenzen prüfen.
+Handwerker-Prüfung: Handwerkskammer Hessen (hwk-hessen.de) Betriebssuche.
+Tipp: Zahlungsplan vertraglich festlegen — nie mehr als 30% Vorauszahlung.
+""",
+
+    # ── Phase C (Rohbau) ──────────────────────────────────────────────────────
+    StageKey.EARTHWORKS: """
+Kontext: Erdarbeiten und Bodenplatte-Vorbereitung.
+Pflichten:
+- Leitungsauskunft einholen VOR Beginn (Wasser, Gas, Strom, Telekom) — Pflicht!
+- Kampfmittelräumdienst Hessen kontaktieren (hessen.de/bürger/kampfmittel) — besonders Frankfurt/Kassel-Umland
+- Baugrundgutachten vorlegen — Bodentyp bestimmt Fundament-Tiefe
+Baugenehmigung: Liegt sie vor? Erst dann darf begonnen werden!
+Bautagebuch: Ab Erdarbeiten führen (wichtig für spätere Abnahmen und Gewährleistung).
+Entsorgung: Aushub-Material — Deklaration auf Schadstoffe, kostenpflichtige Entsorgung bei Belastung.
+Checkliste:
+- [ ] Leitungsauskunft vollständig
+- [ ] Kampfmittelfreigabe (Hessen)
+- [ ] Baugenehmigung auf der Baustelle ausgehängt (HBO §72)
+- [ ] Bauzaun und Bauschild aufgestellt
+""",
+    StageKey.FOUNDATION: """
+Kontext: Fundament und Keller — Grundlage des gesamten Baus.
+Typen: Streifenfundament, Bodenplatte, Kellergeschoss (UG), Tiefgründung bei schlechtem Baugrund.
+Normen:
+- DIN 1054: Baugrund, Sicherheitsnachweise
+- DIN 18533: Abdichtung von Erdberührten Bauteilen (neue Norm seit 2017)
+- DIN EN 206: Beton-Spezifikation (Expositionsklassen beachten — XC, XF, XS)
+Statik: Standsicherheitsnachweis vom Statiker (Bauvorlageberechtigter) erforderlich.
+Feuchtigkeitsschutz: Perimeterdämmung + Drainage besonders bei Hanglage Hessen.
+Bauaufsicht: Untere Bauaufsichtsbehörde kann Rohbauabnahme verlangen (§81 HBO).
+Energieausweis: Kellerdeckendämmung nach GEG mindestens U=0,30 W/(m²K).
+Checkliste:
+- [ ] Bodengutachten vorliegt
+- [ ] Statik geprüft und genehmigt
+- [ ] Schalung, Bewehrung, Betonage — Eigenüberwachung dokumentieren
+""",
+    StageKey.WALLS_CEILINGS: """
+Kontext: Mauerwerk und Decken — Rohbauphase.
+Baustoffe gängig in Hessen:
+- Kalksandstein (KS): hohes Eigengewicht, gute Schalldämmung, günstig
+- Poroton/Ziegel: bessere Wärmedämmung, leichter
+- Porenbeton (Ytong): sehr leicht, gute Dämmwerte, Feuchtigkeitsempfindlich
+Normen:
+- DIN EN 1996: Eurocode 6 — Mauerwerksbau
+- DIN 4109-1: Schallschutz im Hochbau (prüfen ob Anforderungen erfüllt)
+Deckenkonstruktionen: Stahlbetondecke, Holzbalkendecke, Elementdecke.
+Sturze: Über Fenster und Türen — Tragfähigkeit vom Statiker bestätigt?
+Baubegleitung: Abnahme Rohbau-Außenwände durch Bauleiter vor Dachaufbau empfohlen.
+GEG: Außenwand-U-Wert max. 0,28 W/(m²K) für Neubau.
+""",
+    StageKey.ROOF: """
+Kontext: Dachkonstruktion und Eindeckung.
+Dachformen in Hessen: Satteldach (häufigste), Walmdach, Pultdach, Flachdach.
+Bebauungsplan prüfen: Dachneigung, Dachfarbe, First-Richtung oft vorgeschrieben!
+Zimmerer: Meisterpflicht, Eintragung Handwerkskammer Hessen.
+Normen:
+- DIN 1052: Holzbauwerke — Standsicherheit Dachstuhl
+- DIN 68800: Holzschutz — chemischer Holzschutz, Belüftung
+- DIN 18338: Dachdeckungs- und Dachabdichtungsarbeiten (VOB/C)
+Wärmedämmung: GEG §15 — Dach/oberste Geschossdecke U ≤ 0,20 W/(m²K).
+Dachflächenfenster: VELUX/Fakro — Statik, Dachneigung, DIN 4108 Tauwasserschutz.
+Blitzschutz: DIN EN 62305 — in Hessen bei Gebäudehöhe >18 m oder Sonderbauten Pflicht.
+Checkliste:
+- [ ] Dachneigung stimmt mit B-Plan überein
+- [ ] Zimmerer Handwerkskarte geprüft
+- [ ] Dachfolie und Konterlattung vor Eindeckung
+""",
+    StageKey.WINDOWS_DOORS_RAW: """
+Kontext: Fenster und Außentüren — Rohbauabschluss.
+GEG-Anforderungen: Fenster U-Wert ≤ 1,3 W/(m²K), Haustür ≤ 1,8 W/(m²K).
+Verglasungen: Dreifach-Wärmeschutz empfohlen (Uw ~ 0,9 W/m²K).
+Schallschutz DIN 4109: Bei Straßenlärm Schallschutzklasse (SSK) 2–4 empfohlen.
+Einbruchschutz:
+- RC 2 (ex WK 2): Empfehlung Polizei Hessen für Haustüren
+- Förderung KfW-455-B bei RC 2+
+Einbau: Fachbetrieb, RAL-Montage-Leitfaden beachten (Luftdichtheit, Wärmebrücken).
+Rollläden/Beschattung: Im B-Plan prüfen ob erlaubt (gilt als Außenveränderung).
+Lüftungsöffnungen: DIN 18017-3 — natürliche Lüftung Bäder ohne Fenster.
+Checkliste:
+- [ ] U-Wert Nachweis GEG vorliegend
+- [ ] Einbauprotokoll und RAL-konformer Einbau
+- [ ] Haustür RC 2+ (Empfehlung)
+""",
+
+    # ── Phase D (Innenausbau) ──────────────────────────────────────────────────
+    StageKey.PLUMBING: """
+Kontext: Sanitär und Rohrleitungen — SHK-Gewerke.
+Meisterpflicht: SHK = Sanitär-, Heizungs- und Klimatechnik (Handwerkskammer Hessen).
+Normen:
+- DIN EN 806: Trinkwasserinstallation
+- TRWI (Technische Regeln Trinkwasserinstallation) — Legionellenschutz
+- DIN 1986: Entwässerungsanlagen
+- DIN 18560: Estriche (bei Fußbodenheizung relevant)
+Anschlüsse: Hauswasseranschluss und Abwasserkanalschacht durch Gemeinde-Netzbetreiber.
+Rohrleitungsplan: Dokumentation alle Wasserleitungen für spätere Wartung pflicht.
+Druckprüfung: Vor dem Verputzen — Druckprüfprotokoll 10 bar, 30 min.
+Warmwasser: Zirkulationsleitung bei >20 m Leitungslänge nach TRWI empfohlen.
+Fußbodenheizung: Estrich-Temperaturprotokoll (Belegreifheizung) erforderlich.
+Checkliste:
+- [ ] SHK-Betrieb Handwerkskarte geprüft
+- [ ] Druckprüfprotokoll vorliegend
+- [ ] Leitungsplan dokumentiert
+""",
+    StageKey.FLOORING: """
+Kontext: Estrich und Bodenbeläge.
+Estricharten:
+- Zementestrich (CT): Standardlösung, schwimmend auf Trittschalldämmung
+- Anhydritestrich (CA): Schneller trocken, nicht feuchtraumgeeignet
+- Trockenestrich: Schnell begehbar, für Holzbalkendecken
+GEG §15: Fußbodendämmung Keller/Erdreich U ≤ 0,35 W/(m²K).
+Trittschallschutz: DIN 4109-2 — mind. TSM ≥ 12 dB über Anforderung.
+Trocknungszeit: Zementestrich mind. 28 Tage vor Belegreife (CM-Messung!).
+Bodenbeläge: Fliesen, Parkett, Vinyl, Teppich — Untergrund prüfen (Feuchte <2% CM).
+Untergrundprüfung: CM-Gerät (Calciumcarbid-Methode) vor Verlegung von Parkett und Vinyl.
+Checkliste:
+- [ ] Estrich-Protokoll vorliegend
+- [ ] CM-Messung vor Belagsverlegung
+- [ ] Belegreife bestätigt
+""",
+    StageKey.TILING: """
+Kontext: Fliesen und Nassbereich-Abdichtung.
+Normen:
+- ZDB-Merkblatt Verbundabdichtung: Abdichtung unter Fliesen in Nassbereichen (Bäder, Duschen)
+- DIN 18157: Ausführung keramischer Bekleidungen
+- DIN 18195: Bauwerksabdichtung (Keller, Außenbereiche)
+Verbundabdichtung: Im Duschbereich Pflicht — Folien oder Flüssigfolie + Dichtband an Ecken.
+Fugenverpressung: Bewegungsfugen alle 3–4 m und besonders in Raum-Ecken (Silikon, keine Verfugmasse).
+Frostschutz: Außen liegende Flächen — Frost- und tausalzbeständige Fliesen (Klasse R11+ Rutschklasse).
+Badezimmer-Planung: Mindestfläche Barrierefreiheit (DIN 18040-2): 120 x 120 cm Dusche.
+Checkliste:
+- [ ] Verbundabdichtung ausgeführt und dokumentiert
+- [ ] Bewegungsfugen geplant
+- [ ] Fließen-Klasse (Rutschhemmung) entsprechend Nutzung
+""",
+    StageKey.PLASTERING: """
+Kontext: Wand- und Deckenputz, Malerarbeiten.
+Putzarten:
+- Innenputz: Kalkgipsputz (Maschinenputz, schnell), Kalkputz (atmungsaktiv), Lehmputz
+- Außenputz: Mineralputz, Silikatputz, Kunstharzputz
+Normen:
+- DIN 18550: Putz und Putzsysteme
+- DIN 55699: Qualitätsstufen Q1–Q4 (Q3/Q4 für hochwertige Innenräume)
+Trocknung: Mindesttrocknungszeit 1 Tag / mm Putzstärke; Lüften aber kein Durchzug.
+Qualitätsstufen:
+  Q2: Standard (Tapezierunterlage), Q3: Sichtfläche, Q4: Streiflicht-geeignet (hochwertig).
+Farbton: Weißgrad Innenwand beeinflusst Helligkeitswert — Lichtplanung berücksichtigen.
+Schimmelschutz: Diffusionsoffene Farben innen, Innendämmung nur dampfdiffusionsoffen.
+Checkliste:
+- [ ] Putzqualität Q2/Q3 vereinbart
+- [ ] Untergrundvorbereitung: Vornetzen bei saugenden Untergründen
+- [ ] Elektroleerrohre und Schlitze VOR Putz verlegt!
+""",
+    StageKey.BUILT_IN_FURNITURE: """
+Kontext: Küche, Einbauschränke, Innenausstattung.
+Küche:
+- Anschlüsse: Starkstrom 230V und ggf. 400V (Herd), Wasser kalt+warm, Abwasser, Dunstabzug
+- Dunstabzugshaube: Freie Lüftung oder Abluft ins Freie (Mauerkasten erforderlich, Schallschutz!)
+- Gasleitungen: Nur durch eingetragenen SHK-Fachbetrieb (DVGW-Zertifizierung)
+Einbauschränke: Maßanfertigung vs. Systemschränke — Maßtoleranz Rohbau ±2 cm einkalkulieren.
+Barrierefreiheit: DIN 18040-2 — Küchenunterschrank-Höhe 80–90 cm, Unterfahrbarkeit.
+Elektrogeräte: Energieeffizienzklasse (EU-Label), für KfW-Effizienzhaus mind. A-Klasse empfohlen.
+Checkliste:
+- [ ] Elektroanschlüsse nach Küchenplan vorbereitet
+- [ ] Abluftkanal (Dunstabzug) geplant und gebaut
+- [ ] Maße mit Küchenplaner abgestimmt
+""",
+    StageKey.LIGHTING: """
+Kontext: Elektroinstallation, Beleuchtung und Haustechnik.
+Grundlage: VDE 0100 — Errichten von Niederspannungsanlagen.
+Lichtplanung:
+- Lux-Werte: Wohnraum 150–300 lx, Küche 300–500 lx, Arbeitszimmer 500 lx
+- Farbtemperatur: Wohnräume 2700–3000K (warm), Arbeit 4000K (neutral)
+- LED: Effizienzklasse mind. A (ab 01.03.2023 EU-Verordnung), Dimmerkompatibilität prüfen
+Schutzklassen Nassbereich: IP44 im Badezimmer (Schutzbereich 2), IP65 in Duschbereich (SB 1).
+Smart-Vorbereitung: Leerrohre für KNX/Z-Wave/Zigbee, oder WLAN-fähige Schalter einplanen.
+Außenbeleuchtung: Bewegungsmelder + Lichtsteuerung = Einbruchschutz + Energiesparen.
+Abnahme: Elektrizitätsprotokoll (VDE), DGUV Prüfbericht.
+Checkliste:
+- [ ] VDE-Messung und Protokoll
+- [ ] IP-Schutzklassen Nassbereich eingehalten
+- [ ] Smarthome-Vorbereitung geplant
+""",
+    StageKey.DOORS_STAIRS: """
+Kontext: Innentüren, Treppen, Treppengeländer.
+Innentüren:
+- Schallschutz: DIN 4109-2 — Wohnungstüren mind. 37 dB Rw; Schlafzimmer mind. 32 dB
+- Brandschutz: T30 (EI230) zwischen Wohnbereich und Garage/Keller (HBO §47)
+- Maße: Standardbreite 86–100 cm; Barrierefreiheit 90 cm lichte Breite (DIN 18040)
+Treppen:
+- DIN 18065: Gebäudetreppen — Steigungsverhältnis 2× Steigehöhe + Auftrittsbreite = 59–65 cm
+- Hessen HBO §35: Mindestbreite Treppen 80 cm (Einfamilienhäuser)
+- Geländer: Ab 4 Treppenstufen (HBO §38), Höhe mind. 90 cm, kein Übersteigen möglich
+- Kindersicherheit: Geländerstäbe max. 12 cm Abstand (HBO §38 Abs. 4)
+Materialien: Massivholz, Fertigtreppe Stahl/Glas, Betontreppe — Kosten sehr unterschiedlich.
+Checkliste:
+- [ ] Treppenstufen-Maße nach DIN 18065
+- [ ] Geländer Höhe und Abstände geprüft
+- [ ] Brandschutztüren wo vorgeschrieben
+""",
+
+    # ── Phase E (Außenanlagen) ─────────────────────────────────────────────────
+    StageKey.FACADE_INSULATION: """
+Kontext: Fassadendämmung und Außenwandabschluss.
+GEG-Anforderungen (§15 Neubau): U-Wert Außenwand ≤ 0,28 W/(m²K).
+WDVS (Wärmedämmverbundsystem = ETICS):
+- Dämmstoffe: EPS (Styropor), Mineralwolle, Phenolharz — Brandschutzstreifen bei >22 m Höhe!
+- Verarbeitungsrichtlinien: ETAG 004 / EAD 040083 — europäisch harmonisiert
+- Mindestdicke Hessen: Bei Sanierung mind. 14 cm EPS 035 empfohlen
+- Hinterlüftete Fassade (VHF): Premium-Alternative, wartungsfreundlicher
+Förderung: BEG Einzelmaßnahme — 15–20% Zuschuss für Fassadendämmung (BAFA).
+Bauaufsicht: Bei Sanierungen über 10% der Fläche: GEG-Nachrüstpflicht für Restgebäude.
+Brandschutz: Bei WDVS ab Gebäudeklasse 4 (>7 m Wandhöhe): Mineralwolle-Brandriegel.
+Checkliste:
+- [ ] U-Wert Berechnung GEG ≤ 0,28
+- [ ] Brandschutznachweis bei >22 m
+- [ ] BAFA-Förderantrag VOR Beauftragung gestellt
+""",
+    StageKey.GARAGE: """
+Kontext: Garage, Carport, Stellplatz.
+Hessen HBO §§ 5, 8:
+- Garagen bis 50 m² (HBO §8): Verfahrensfrei (keine Baugenehmigung nötig)
+- Garagen > 50 m²: Vereinfachtes Genehmigungsverfahren
+- Stellplatznachweis: Je Wohneinheit mind. 1 Stellplatz (GaStellVO Hessen)
+Abstandsflächen HBO §6:
+- Garage an Grundstücksgrenze: Möglich wenn ≤ 9 m lang, ≤ 3 m Wandhöhe, ≤ 50 m² (Grenzbau)
+- Mindestabstand zu Gebäuden: Brandschutz DIN 14090 — mind. 1 m zu Hauptgebäude
+Elektromobilität: Leerrohre zur Garage für Wallbox vorbereiten (mind. NYY-J 5×4 mm², 32A).
+Förderung: KfW-440 entfallen 2024 — aktuelle Wallbox-Förderung beim Stromanbieter prüfen.
+Checkliste:
+- [ ] Genehmigungspflicht geprüft (>50 m²?)
+- [ ] Stellplatznachweis nach GaStellVO
+- [ ] E-Ladeinfrastruktur (Leerrohr) vorbereitet
+""",
+    StageKey.GARDEN: """
+Kontext: Gartengestaltung, Terrasse, Außenanlagen.
+Genehmigungsfreiheit (HBO §8): Gartenmauern bis 2 m Höhe, Terrassenüberdachungen bis 30 m².
+Terrasse:
+- Überdachung > 30 m²: Genehmigungspflichtig (verfahrensfrei bis 30 m²)
+- Anschluss an Wohngebäude: GRZ beachten (Terrasse zählt zur Versiegelung!)
+Regenwassermanagement:
+- Hessen: Versickerungsanlagen präferiert (Rigole, begrüntes Dach)
+- Retentionszisternen: Mind. 3.000 L für >200 m² Grundstück empfohlen (FNP Hessen)
+- Einleitung in Kanal: Gebührenpflichtig, Genehmigung Gemeinde
+Begrünung: Klimawandel-Strategie Hessen — Flächenentsiegelung, einheimische Pflanzen.
+Checkliste:
+- [ ] GRZ geprüft — Terrasse in Grundflächenzahl einkalkuliert?
+- [ ] Entwässerungskonzept (Versickerung)
+- [ ] Überdachung ≤ 30 m² (sonst Genehmigung)
+""",
+    StageKey.DRIVEWAY: """
+Kontext: Zufahrt, Pflasterung, Außenbelag.
+Versiegelung: Befestigte Flächen zählen zur GRZ (Grundflächenzahl) — max. GRZ+25% Überschreitung erlaubt (§17 BauNVO).
+Wasserdurchlässigkeit:
+- Hessen: Versickerungsfähige Beläge bevorzugt (Rasengitter, Schotterrasen, Pflaster mit Fugenanteil)
+- Undurchlässige Flächen > 100 m²: Genehmigung Untere Wasserbehörde
+Materialien: Betonpflaster, Naturstein, Kies, Asphalt — Frost- und Schwerverkehrsklassen beachten.
+Tiefbau: Unterbau Frostschutzschicht (Hessen: 80 cm Frosttiefe) — sonst Hebungen im Winter.
+Straßenanschluss: Genehmigung beim Straßenbaulastträger (Gemeinde, Kreis, RP Kassel/Darmstadt).
+Entwässerung: Längsneigung min. 1,5%, Querneigung 2–4% — Wasserableitung zur Rigole.
+Checkliste:
+- [ ] GRZ + Versiegelungsanteil geprüft
+- [ ] Tiefbau Frostschutzschicht ≥ 80 cm
+- [ ] Straßenanschluss genehmigt
+""",
+    StageKey.FENCING: """
+Kontext: Einfriedungen, Zäune, Tore.
+Hessen HBO §8: Einfriedungen bis 2 m Höhe verfahrensfrei.
+Grenzbebauung:
+- Zaun direkt auf Grenzlinie: Einigung mit Nachbar empfohlen (Nachbarrechtsgesetz Hessen §§22-32)
+- Gemeinsamer Zaun: Kosten hälftig (HSOG §922 BGB)
+Sichtschutz: B-Plan kann Einfriedungsart/-höhe vorschreiben — zuerst prüfen!
+Elektrotore: VDE 0100-720; CE-Kennzeichnung und EN 12453 (Kraftbegrenzung) Pflicht.
+Hecken: Grenzabstand Hessen: mind. 50 cm bei <1,2 m Höhe, 75 cm bei >1,2 m (NRG §3).
+Baumbestand: Hessen Baumschutzsatzungen der Gemeinden — Fällung oft genehmigungspflichtig!
+Checkliste:
+- [ ] B-Plan: Einfriedungsvorschriften?
+- [ ] Nachbar informiert/Einigung für GrenzZaun
+- [ ] Elektrisches Tor: CE + EN 12453 Prüfprotokoll
+""",
+
+    # ── Phase F (Haustechnik) ──────────────────────────────────────────────────
+    StageKey.VENTILATION: """
+Kontext: Lüftungsanlage und Klimatechnik.
+GEG §26: Luftdichtheitsnachweis bei Lüftungsanlage — Blower-Door-Test.
+Lüftungskonzept DIN 1946-6: Pflicht für KfW-Effizienzhäuser; obligatorisch wenn n50 ≤ 3,0 h⁻¹.
+Typen:
+- Freie Stoßlüftung: Nur bei n50 < 3,0 h⁻¹ zulässig für Passivhaus-nahe Gebäude
+- KWL (Kontrollierte Wohnraumlüftung): Wärmerückgewinnung ≥ 75%; KfW-261-Pflicht bei EH40
+- Abluftanlage: Bad/WC-Entlüftung nach DIN 18017-3
+Schall: Lüftungsanlage DIN 4109 — max. 25 dB(A) im Wohnraum.
+Filter: HEPA H13 empfohlen bei Pollenallergie; Wartungsvertrag für Filter.
+Wärmebrücken: Lüftungsrohre durch nicht gedämmte Bauteile → Kondensation möglich.
+Blower-Door: Messung nach Fertigstellung — Nachweis für KfW-261 und GEG.
+Checkliste:
+- [ ] Lüftungskonzept DIN 1946-6 vorliegend
+- [ ] Blower-Door-Test geplant (nach Fertigstellung)
+- [ ] KWL-Anlage: Wärmerückgewinnung ≥ 75%
+""",
+    StageKey.ENERGY_CERTIFICATE: """
+Kontext: Energieausweis und GEG-Endabnahme.
+Pflicht: §§79-88 GEG — Energieausweis bei Neubau Pflicht, 10 Jahre gültig.
+Aussteller: Energieberater mit Listung in dena-Energieeffizienz-Expertenliste (zugelassen nach GEG §88).
+Typen:
+- Bedarfsausweis: Berechnung auf Basis Gebäudehülle und Anlagentechnik (Neubau: immer Bedarfsausweis)
+- Verbrauchsausweis: Nur bei ≥ 5 Jahre bewohntem Gebäude möglich
+KfW-Bestätigungen:
+- Technische Projektbeschreibung des Energieeffizienz-Experten (vor Antragstellung)
+- Bestätigung nach Durchführung (BnD) — nach Fertigstellung erforderlich für KfW-Auszahlung!
+Energieeffizienzklassen: A+ bis H — Neubau GEG-Anforderung entspricht ca. B–A.
+Einreichung Bauamt: Energieausweis bei Baufertigstellungsanzeige (HBO §72) vorlegen.
+Checkliste:
+- [ ] Energieberater (dena-Liste) beauftragt
+- [ ] KfW-BnD rechtzeitig (innerhalb 6 Monate nach Fertigstellung)
+- [ ] Energieausweis ausgestellt und vorhanden
+""",
+    StageKey.SMART_HOME: """
+Kontext: Smart-Home-Systeme und Hausautomation.
+Systeme im Markt:
+- KNX (Bus): Professionell, zuverlässig, teuer (~15.000–25.000 € für EFH)
+- Z-Wave/Zigbee: Günstiger, Funkbasiert, Mesh-Netzwerk
+- WLAN-basiert (Philips Hue, Shelly, Matter): Einfachste Installation
+Matter-Standard: Neue Geräte (ab 2023) mit Matter kompatibel — Herstellerunabhängig.
+Integration: Loxone, Homematic IP, ioBroker, Home Assistant (Open Source).
+GEG §71a: Gebäudeautomation Klasse B ab 2025 für Nicht-Wohngebäude >290 kW Heizlast.
+Elektrovorbereitung: BUS-Kabel (KNX: J-Y(ST)Y 2×2×0,8) bei KNX-Planung früh verlegen!
+Datenschutz: Lokale Steuerung bevorzugen (kein Cloud-Pflicht) — DSGVO-Konformität.
+Smarte Zähler: Einbau moderner Messeinrichtung ab 6.000 kWh/Jahr Pflicht (Messstellenbetrieb).
+Checkliste:
+- [ ] System gewählt (KNX/Funk/Matter)
+- [ ] Leerrohre für BUS-Kabel verlegt (falls KNX)
+- [ ] Datenschutzkonzept (lokal vs. Cloud)
+""",
+
+    # ── Phase G (Abschluss) ────────────────────────────────────────────────────
+    StageKey.FINAL_ACCEPTANCE: """
+Kontext: Bauabnahme und Fertigstellung.
+Baufertigstellungsanzeige: HBO §72 — Pflicht binnen 2 Wochen nach Bezugsfertigkeit.
+Abnahme-Checkliste mit Bauleiter:
+- Alle Berichtbestandteile vollständig? (Statik, Energieausweis, Prüfberichte)
+- VDE-Protokoll Elektro vorhanden?
+- Druckprüfprotokoll Sanitär vorhanden?
+- Blower-Door-Test Ergebnis?
+- Alle Mängel dokumentiert?
+Mangelverfolgung: Mängelrüge schriftlich (per Einschreiben) mit Fristsetzung (§634 BGB).
+Gewährleistung: 5 Jahre auf Bauleistungen (§634a BGB), 2 Jahre bei Kauf vom Bauträger.
+Übergabeprotokoll: Schlüssel, Bedienungsanleitungen, Garantiescheine, Wartungsverträge, Pläne.
+Versicherung: Fertigstellung = Gebäudeversicherung aktiv (vorher Feuerohling-Versicherung!).
+Checkliste:
+- [ ] Baufertigstellungsanzeige Bauamt (HBO §72)
+- [ ] Übergabeprotokoll mit Bauleiter
+- [ ] Gebäudeversicherung ab Übergabe aktiv
+""",
+    StageKey.OFFICIAL_NOTICES: """
+Kontext: Behördliche Anzeigen, Ummeldungen, Anschlüsse.
+Pflichtmeldungen nach Fertigstellung:
+1. Baufertigstellungsanzeige Bauaufsicht (HBO §72)
+2. Anmeldung beim Einwohnermeldeamt (Wohnsitz ummelden, §17 BMG 2 Wochen!)
+3. Grundsteuer: Festsetzungsbescheid Finanzamt (Grundsteuerwert nach §219 BewG)
+4. Stromzähler: Netzanschluss/Zählerstellung beim Netzbetreiber
+5. Gas: Erstinbetriebnahme durch SHK-Fachbetrieb und Netzbetreiber
+6. Versicherungen: Gebäudeversicherung aktivieren (Bauleistungsversicherung kündigen)
+7. Förderung: KfW-BnD (Bestätigung nach Durchführung) — FRIST 6 Monate!
+8. PV-Anlage Marktstammdatenregister (1 Monat nach Inbetriebnahme, Pflicht!)
+9. Heizung: Schornsteinfeger / Bezirksschornsteinfegermeister — Abnahme und Feuerstättenschau
+Checkliste:
+- [ ] KfW-BnD innerhalb 6 Monate abgerufen
+- [ ] Ummeldung Einwohnermeldeamt
+- [ ] Schornsteinfeger Feuerstättenschau
+""",
+    StageKey.MOVE_IN: """
+Kontext: Einzug und Erstbezug.
+Checkliste Einzug:
+- [ ] Strom-/Gas-/Wasser-/Internet-Verträge auf neue Adresse umschreiben
+- [ ] Zählerstände dokumentieren bei Einzug (Foto!)
+- [ ] Hausratversicherung an neue Wohnfläche anpassen
+- [ ] Kfz ummelder (neue Adresse auf Führerschein innerhalb 1 Woche)
+- [ ] Bank/Post/Behörden Adressänderung mitteilen
+- [ ] Klingel- und Briefkastenschilder
+Einregulierung Haustechnik:
+- Heizung hydraulisch abgleichen (GEG-Pflicht ab 2024 im Neubau)
+- Lüftungsanlage einmessen und Protokoll
+- Smart-Home Einprogrammieren / Zeitpläne anlegen
+Übergabe-Dokumentation aufbewahren: Pläne, Bauunterlagen, Garantiescheine — wichtig für Gewährleistung und Versicherungen.
+Erstjahr: Schwundrisse möglich (Neubautrocknungsschrumpfung) — Normalerscheinung, Nachbesserung nach 12 Monaten.
+Checkliste:
+- [ ] Alle Zählerstände bei Einzug notiert
+- [ ] Heizung hydraulisch abgleichen
+- [ ] Dokumentenmappe vollständig
+""",
+    StageKey.WARRANTY_TRACKING: """
+Kontext: Gewährleistungsverfolgung und Mängelmanagement.
+Fristen (§634a BGB):
+- Bauleistungen: 5 Jahre Gewährleistung (ab Abnahme)
+- Bauträgerkauf: 2 Jahre (möglicherweise 5 Jahre je nach Vertrag)
+- Elektrogeräte, Einbauküchen: 2 Jahre Händlergewährleistung
+Verjährungshemmung: Mängelrüge schriftlich mit Fristsetzung → Verjährung wird gehemmt.
+Typische Gewährleistungsmängel im 1.–5. Jahr:
+- Schwundrisse (normal wenn < 0,2 mm, füllen lassen)
+- Feuchtigkeit Keller/Bodenplatte (sofort rügen! kurze Frist)
+- Heizungsprobleme, Thermostatventile
+- Bodenfugen, Fliesenrisse
+- Fenster/Türen-Verzug (Holzquellen bei Erstbezug)
+Dokumentation: Alle Mängel mit Datum, Foto, schriftlicher Rüge dokumentieren.
+Bauversicherungen: Feuerrohbau, Bauleistungsversicherung, Bauherren-Haftpflicht abrechnen.
+Checkliste:
+- [ ] Gewährleistungsfristen-Kalender erstellt (5 Jahre ab Abnahme-Datum)
+- [ ] Alle Mängel schriftlich gerügt
+- [ ] Versicherungen korrekt umgestellt
+""",
 }
 
 
