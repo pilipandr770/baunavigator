@@ -64,6 +64,35 @@
     </div>
   </div>
 </div>
+
+<!-- Archived Projects -->
+{% if archived %}
+<div class="card mt-24">
+  <div class="card-header" style="cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+    <div class="card-title" style="color:var(--text-m);">🗄 Archivierte Projekte ({{ archived|length }})</div>
+    <div class="card-subtitle">Klicken zum Auf-/Zuklappen</div>
+  </div>
+  <div style="display:none;">
+    <div class="grid-3" style="padding:16px;">
+      {% for project in archived %}
+      <a href="{{ url_for('project.detail', project_id=project.id) }}"
+         class="project-card" style="opacity:0.7;border-style:dashed;">
+        <div class="project-card-title" style="color:var(--text-m);">
+          🗄 {{ project.title }}
+        </div>
+        <div class="project-card-meta">
+          {{ project.address_city or '—' }} ·
+          {{ project_type_labels.get(project.project_type, project.project_type.value) }}
+        </div>
+        <div class="text-small text-muted">
+          Archiviert · {{ project.completion_percent() }}% abgeschlossen
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

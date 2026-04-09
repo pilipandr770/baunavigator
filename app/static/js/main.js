@@ -167,6 +167,44 @@ function showResult(text, mode) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+async function generateAiDocument(projectId, stageKey) {
+  const docType = prompt(
+    'Dokumenttyp wählen:\nBAUANTRAG, BAUGENEHMIGUNG, VERTRAG, GUTACHTEN, SONSTIGES',
+    'SONSTIGES'
+  );
+  if (!docType) return;
+
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'KI erstellt Dokument...';
+
+  try {
+    const resp = await fetch(`/ai/generate-document/${projectId}/${stageKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ doc_type: docType.trim().toUpperCase() }),
+    });
+    const data = await resp.json();
+
+    if (data.answer) {
+      showResult(data.answer, 'confirmation_required');
+      if (data.saved) {
+        showToast('Dokument wurde gespeichert (KI-Entwurf)', 'success');
+      }
+    } else {
+      showToast('Fehler: ' + (data.error || 'Unbekannt'), 'danger');
+    }
+  } catch {
+    showToast('Verbindungsfehler', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📄 Dokument per KI erstellen';
+  }
+}
+
 function getCsrfToken() {
   const meta = document.querySelector('meta[name="csrf-token"]');
   return meta ? meta.getAttribute('content') : '';

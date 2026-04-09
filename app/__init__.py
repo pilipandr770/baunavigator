@@ -131,4 +131,8 @@ def create_app():
 
     from app.models.enums import StageKey, ActionMode
 
+    # ── Background scheduler ──────────────────────────
+    from app.services.scheduler import init_scheduler
+    init_scheduler(app)
+
     return app

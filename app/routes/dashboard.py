@@ -21,8 +21,15 @@ def index():
         .order_by(Project.updated_at.desc())
         .all()
     )
+    archived = (
+        Project.query
+        .filter_by(user_id=current_user.id, is_active=False)
+        .order_by(Project.updated_at.desc())
+        .all()
+    )
     return render_template('dashboard/index.html',
                            projects=projects,
+                           archived=archived,
                            stage_labels=STAGE_LABELS,
                            project_type_labels=PROJECT_TYPE_LABELS)
 

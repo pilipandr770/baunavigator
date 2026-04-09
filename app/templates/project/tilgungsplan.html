@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Tilgungsplan — {{ project.title }}{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div class="text-small text-muted mb-8">
+      <a href="{{ url_for('project.financing', project_id=project.id) }}">Finanzierung</a> →
+    </div>
+    <h1 class="page-title">Tilgungsplan</h1>
+    <p class="text-small text-muted">{{ project.title }}</p>
+  </div>
+  <button onclick="window.print()" class="btn btn-primary no-print">
+    🖨 Drucken / PDF speichern
+  </button>
+</div>
+
+<!-- Summary card -->
+<div class="card mb-24 no-print">
+  <div class="card-header"><div class="card-title">Zusammenfassung</div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;padding:0 20px 20px;">
+    <div>
+      <div class="text-small text-muted">Darlehensbetrag</div>
+      <div style="font-size:18px;font-weight:700;">{{ "{:,.0f}".format(summary.loan) }} €</div>
+    </div>
+    <div>
+      <div class="text-small text-muted">Zinssatz p.a.</div>
+      <div style="font-size:18px;font-weight:700;">{{ "%.2f"|format(summary.zinssatz) }} %</div>
+    </div>
+    <div>
+      <div class="text-small text-muted">Laufzeit</div>
+      <div style="font-size:18px;font-weight:700;">{{ summary.laufzeit_years }} Jahre</div>
+    </div>
+    <div>
+      <div class="text-small text-muted">Monatliche Rate</div>
+      <div style="font-size:18px;font-weight:700;color:var(--c-blue);">{{ "{:,.2f}".format(summary.monthly_rate) }} €</div>
+    </div>
+    <div>
+      <div class="text-small text-muted">Gesamtzinsen</div>
+      <div style="font-size:18px;font-weight:700;color:var(--c-coral);">{{ "{:,.0f}".format(summary.total_interest) }} €</div>
+    </div>
+    <div>
+      <div class="text-small text-muted">Gesamtzahlung</div>
+      <div style="font-size:18px;font-weight:700;">{{ "{:,.0f}".format(summary.total_payment) }} €</div>
+    </div>
+  </div>
+</div>
+
+<!-- Print header -->
+<div class="print-only" style="margin-bottom:20px;">
+  <h2 style="margin:0;">Tilgungsplan — {{ project.title }}</h2>
+  <p style="margin:4px 0 0;font-size:12px;color:#666;">
+    Darlehen: {{ "{:,.0f}".format(summary.loan) }} € | Zinssatz: {{ "%.2f"|format(summary.zinssatz) }} % p.a. |
+    Laufzeit: {{ summary.laufzeit_years }} Jahre | Rate: {{ "{:,.2f}".format(summary.monthly_rate) }} €/Monat
+    {% if summary.bank_name %} | Bank: {{ summary.bank_name }}{% endif %}
+  </p>
+</div>
+
+<!-- Year toggle buttons -->
+<div class="no-print mb-16" style="display:flex;gap:8px;flex-wrap:wrap;">
+  <button class="btn btn-secondary btn-sm active" id="btn-all" onclick="showView('all')">Alle Monate</button>
+  <button class="btn btn-secondary btn-sm" id="btn-year" onclick="showView('year')">Jahresübersicht</button>
+</div>
+
+<!-- Monthly table -->
+<div id="view-all">
+  <div class="card" style="overflow-x:auto;">
+    <table class="table" id="tilgung-table">
+      <thead>
+        <tr>
+          <th>Monat</th>
+          <th>Jahr</th>
+          <th style="text-align:right">Rate (€)</th>
+          <th style="text-align:right">Zinsen (€)</th>
+          <th style="text-align:right">Tilgung (€)</th>
+          <th style="text-align:right">Restschuld (€)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr {% if row.month % 12 == 0 %}style="border-bottom:2px solid var(--c-blue);font-weight:600;"{% endif %}>
+          <td>{{ row.month }}</td>
+          <td>{{ row.year }}</td>
+          <td style="text-align:right">{{ "{:,.2f}".format(row.payment) }}</td>
+          <td style="text-align:right;color:var(--c-coral)">{{ "{:,.2f}".format(row.interest) }}</td>
+          <td style="text-align:right;color:var(--c-green)">{{ "{:,.2f}".format(row.principal) }}</td>
+          <td style="text-align:right;font-weight:{% if row.balance == 0 %}700{% else %}400{% endif %}">
+            {{ "{:,.2f}".format(row.balance) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Annual summary table -->
+<div id="view-year" style="display:none;">
+  <div class="card" style="overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Jahr</th>
+          <th style="text-align:right">Gesamtrate (€)</th>
+          <th style="text-align:right">Zinsen (€)</th>
+          <th style="text-align:right">Tilgung (€)</th>
+          <th style="text-align:right">Restschuld am Ende (€)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set ns = namespace(yr=0, yr_pay=0, yr_int=0, yr_pr=0) %}
+        {% for row in rows %}
+          {% if row.month % 12 == 0 %}
+            {% set ns.yr = ns.yr + 1 %}
+            {% set ns.yr_pay = ns.yr_pay + row.payment %}
+            {% set ns.yr_int = ns.yr_int + row.interest %}
+            {% set ns.yr_pr = ns.yr_pr + row.principal %}
+            {# Need full-year totals — we aggregate via js below #}
+          {% endif %}
+        {% endfor %}
+        {# Rendered via JS from the monthly data #}
+      </tbody>
+    </table>
+    <div id="year-table-body"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Build annual data from monthly rows
+const monthlyRows = [
+  {% for row in rows %}
+  { month: {{ row.month }}, year: {{ row.year }}, payment: {{ row.payment }}, interest: {{ row.interest }}, principal: {{ row.principal }}, balance: {{ row.balance }} }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+function buildYearTable() {
+  const yearMap = {};
+  for (const r of monthlyRows) {
+    if (!yearMap[r.year]) yearMap[r.year] = { payment: 0, interest: 0, principal: 0, balance: 0 };
+    yearMap[r.year].payment += r.payment;
+    yearMap[r.year].interest += r.interest;
+    yearMap[r.year].principal += r.principal;
+    yearMap[r.year].balance = r.balance;
+  }
+  let html = '<table class="table"><thead><tr><th>Jahr</th><th style="text-align:right">Gesamtrate (€)</th><th style="text-align:right">Zinsen (€)</th><th style="text-align:right">Tilgung (€)</th><th style="text-align:right">Restschuld (€)</th></tr></thead><tbody>';
+  for (const [yr, d] of Object.entries(yearMap)) {
+    html += `<tr><td>${yr}</td><td style="text-align:right">${fmt(d.payment)}</td><td style="text-align:right;color:var(--c-coral)">${fmt(d.interest)}</td><td style="text-align:right;color:var(--c-green)">${fmt(d.principal)}</td><td style="text-align:right">${fmt(d.balance)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('year-table-body').innerHTML = html;
+}
+
+function fmt(n) {
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function showView(v) {
+  document.getElementById('view-all').style.display = v === 'all' ? '' : 'none';
+  document.getElementById('view-year').style.display = v === 'year' ? '' : 'none';
+  document.getElementById('btn-all').classList.toggle('active', v === 'all');
+  document.getElementById('btn-year').classList.toggle('active', v === 'year');
+  if (v === 'year') buildYearTable();
+}
+
+buildYearTable();
+</script>
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  nav, .sidebar, .page-header button { display: none !important; }
+  .card { box-shadow: none !important; border: 1px solid #ccc !important; }
+  table { font-size: 11px; }
+  th, td { padding: 3px 6px !important; }
+  #view-year { display: none !important; }
+}
+.print-only { display: none; }
+.btn.active { background: var(--c-blue); color: #fff; }
+</style>
+{% endblock %}

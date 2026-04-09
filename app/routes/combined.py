@@ -121,6 +121,107 @@ def providers_for_stage(project_id, stage_key):
     return jsonify(result)
 
 
+@ai_bp.route('/generate-document/<project_id>/<stage_key>', methods=['POST'])
+@login_required
+def generate_document(project_id, stage_key):
+    """
+    AI generates a text document draft for the given stage.
+    Saved as Document with generated_by_ai=True and returned to JS.
+    """
+    from app.models.models import Document, now_utc
+    from app.models.enums import DocType
+    import uuid as _uuid
+
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    try:
+        sk = StageKey(stage_key)
+    except ValueError:
+        return jsonify({'error': 'Ungültiger Schritt'}), 400
+
+    stage = project.stages.filter_by(stage_key=sk).first_or_404()
+    data = request.get_json() or {}
+    doc_type_str = data.get('doc_type', 'SONSTIGES')
+    try:
+        doc_type = DocType(doc_type_str)
+    except ValueError:
+        doc_type = DocType.SONSTIGES
+
+    # Build a tailored AI prompt per doc type
+    doc_type_prompts = {
+        DocType.BAUANTRAG: (
+            "Erstellen Sie einen vollständigen Bauantrag-Entwurf nach HBO Hessen. "
+            "Nutzen Sie die Projektdaten. Gliedern Sie klar: Antragsteller, Grundstück, "
+            "Vorhaben, Begründung, Anlagen-Liste. Formeller Stil."
+        ),
+        DocType.BAUGENEHMIGUNG: (
+            "Erstellen Sie eine Checkliste aller Unterlagen, die für die Baugenehmigung "
+            "nach HBO Hessen §§ 64–66 benötigt werden, bezogen auf dieses Projekt."
+        ),
+        DocType.VERTRAG: (
+            "Erstellen Sie einen strukturierten Werkvertragsentwurf gemäß BGB §§ 631 ff. "
+            "und VOB/B für diesen Bauschritt. Weisen Sie explizit darauf hin, dass dieser "
+            "Entwurf vor Unterzeichnung von einem Rechtsanwalt geprüft werden sollte."
+        ),
+        DocType.GUTACHTEN: (
+            "Erstellen Sie eine strukturierte Vorlage für ein Baugutachten zu diesem Schritt. "
+            "Gliedern Sie: Aufgabenstellung, Befund, Bewertung, Empfehlungen."
+        ),
+    }
+    prompt_extra = doc_type_prompts.get(doc_type, (
+        f"Erstellen Sie ein professionelles Dokument vom Typ '{doc_type.value}' "
+        f"für den Bauschritt '{STAGE_LABELS.get(sk, sk.value)}' des Projekts. "
+        "Gliedern Sie den Text klar und verwenden Sie korrekten formellen deutschen Stil."
+    ))
+
+    project_info = (
+        f"Projekt: {project.title}\n"
+        f"Adresse: {project.address or ''}, {project.address_plz or ''} {project.address_city or ''}\n"
+        f"Typ: {project.project_type.value}\n"
+        f"Bauschritt: {STAGE_LABELS.get(sk, sk.value)}\n"
+    )
+
+    full_prompt = f"{project_info}\n{prompt_extra}"
+
+    from app.services.ai_service import ask_ai
+    ai_result = ask_ai(
+        user_message=full_prompt,
+        project=project,
+        stage_key=sk,
+        action_type=ActionType.DOCUMENT_GENERATE,
+        mode=ActionMode.DIRECT,
+        user_id=current_user.id,
+    )
+
+    content = ai_result.get('answer', ai_result.get('result', ''))
+    if not content:
+        return jsonify({'error': 'KI konnte kein Dokument erstellen.'}), 500
+
+    # Save as Document record
+    doc = Document(
+        id=str(_uuid.uuid4()),
+        project_id=project.id,
+        stage_id=stage.id,
+        doc_type=doc_type,
+        filename=f"ki-entwurf-{sk.value}-{doc_type.value}.txt",
+        original_filename=f"KI-Entwurf {STAGE_LABELS.get(sk, sk.value)}.txt",
+        generated_by_ai=True,
+        ai_draft_content=content,
+        description=f"KI-generierter Entwurf — {doc_type.value}",
+        uploaded_at=now_utc(),
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    return jsonify({
+        'answer': content,
+        'doc_id': doc.id,
+        'saved': True,
+    })
+
+
 # ─── Outbox Blueprint ──────────────────────────────────────────────────────────
 outbox_bp = Blueprint('outbox', __name__)
 

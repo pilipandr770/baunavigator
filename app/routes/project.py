@@ -152,6 +152,7 @@ def stage_detail(project_id, stage_key):
     documents = stage.documents.all()
     outbox = stage.outbox_messages.all()
 
+    from datetime import date as _date
     return render_template('project/stage.html',
                            project=project,
                            stage=stage,
@@ -159,7 +160,8 @@ def stage_detail(project_id, stage_key):
                            documents=documents,
                            outbox=outbox,
                            doc_types=DocType,
-                           doc_type_labels=DOC_TYPE_LABELS)
+                           doc_type_labels=DOC_TYPE_LABELS,
+                           today=_date.today())
 
 
 @project_bp.route('/<project_id>/stage/<stage_key>/complete', methods=['POST'])
@@ -233,7 +235,63 @@ def financing_save(project_id):
     return redirect(url_for('project.financing', project_id=project_id))
 
 
-@project_bp.route('/<project_id>/stage/<stage_key>/upload', methods=['POST'])
+@project_bp.route('/<project_id>/tilgungsplan')
+@login_required
+def tilgungsplan(project_id):
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    fin = project.financing
+    if not fin or not fin.bank_loan_amount or not fin.bank_zinssatz or not fin.laufzeit_years:
+        flash('Bitte zuerst Bankdarlehen, Zinssatz und Laufzeit eintragen.', 'warning')
+        return redirect(url_for('project.financing', project_id=project_id))
+
+    P = float(fin.bank_loan_amount)
+    annual_rate = float(fin.bank_zinssatz) / 100
+    r = annual_rate / 12
+    n = int(fin.laufzeit_years) * 12
+
+    if r == 0:
+        monthly_payment = P / n
+    else:
+        monthly_payment = P * r * (1 + r) ** n / ((1 + r) ** n - 1)
+
+    rows = []
+    balance = P
+    total_interest = 0.0
+    total_principal = 0.0
+
+    for month in range(1, n + 1):
+        interest = balance * r
+        principal = monthly_payment - interest
+        balance -= principal
+        if balance < 0.005:
+            balance = 0.0
+        total_interest += interest
+        total_principal += principal
+        rows.append({
+            'month': month,
+            'year': (month - 1) // 12 + 1,
+            'payment': monthly_payment,
+            'interest': interest,
+            'principal': principal,
+            'balance': balance,
+        })
+
+    summary = {
+        'loan': P,
+        'monthly_rate': monthly_payment,
+        'total_payment': monthly_payment * n,
+        'total_interest': total_interest,
+        'total_principal': total_principal,
+        'laufzeit_years': int(fin.laufzeit_years),
+        'zinssatz': float(fin.bank_zinssatz),
+        'bank_name': fin.bank_name or '',
+    }
+
+    return render_template('project/tilgungsplan.html',
+                           project=project, rows=rows, summary=summary)
 @login_required
 def upload_document(project_id, stage_key):
     project = Project.query.filter_by(
@@ -373,5 +431,38 @@ def save_notes(project_id, stage_key):
     stage.notes = request.form.get('notes', '').strip() or None
     db.session.commit()
     flash('Notizen gespeichert.', 'success')
+    return redirect(url_for('project.stage_detail', project_id=project_id, stage_key=stage_key))
+
+
+@project_bp.route('/<project_id>/stage/<stage_key>/deadline', methods=['POST'])
+@login_required
+def save_deadline(project_id, stage_key):
+    from datetime import date as _date
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id, is_active=True
+    ).first_or_404()
+    try:
+        sk = StageKey(stage_key)
+    except ValueError:
+        flash('Ungültiger Schritt.', 'danger')
+        return redirect(url_for('project.detail', project_id=project_id))
+
+    stage = project.stages.filter_by(stage_key=sk).first()
+    if not stage:
+        flash('Schritt nicht gefunden.', 'danger')
+        return redirect(url_for('project.detail', project_id=project_id))
+
+    raw = request.form.get('deadline_at', '').strip()
+    if raw:
+        try:
+            stage.deadline_at = _date.fromisoformat(raw)
+            flash('Frist gespeichert.', 'success')
+        except ValueError:
+            flash('Ungültiges Datum.', 'danger')
+    else:
+        stage.deadline_at = None
+        flash('Frist entfernt.', 'info')
+
+    db.session.commit()
     return redirect(url_for('project.stage_detail', project_id=project_id, stage_key=stage_key))
 

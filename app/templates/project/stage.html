@@ -154,6 +154,36 @@
     </div>
     {% endif %}
 
+    <!-- Deadline -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">⏰ Frist (Deadline)</div></div>
+      <form method="POST" action="{{ url_for('project.save_deadline', project_id=project.id, stage_key=stage.stage_key.value) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="form-group" style="flex:1;min-width:160px;margin-bottom:0;">
+            <label class="form-label">Fristdatum</label>
+            <input type="date" name="deadline_at" class="form-control"
+                   value="{{ stage.deadline_at.isoformat() if stage.deadline_at else '' }}">
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm" style="height:38px;">Speichern</button>
+          {% if stage.deadline_at %}
+          <button type="submit" name="deadline_at" value="" class="btn btn-sm"
+                  style="height:38px;color:var(--c-coral);border-color:var(--c-coral);">Entfernen</button>
+          {% endif %}
+        </div>
+        {% if stage.deadline_at %}
+        {% set days_left = (stage.deadline_at - today).days %}
+        <div class="mt-8 text-small" style="color:{% if days_left < 0 %}var(--c-coral){% elif days_left <= 3 %}orange{% else %}var(--c-green){% endif %}">
+          {% if days_left < 0 %}⚠ Frist überschritten ({{ days_left|abs }} Tage)
+          {% elif days_left == 0 %}🔴 Frist endet heute!
+          {% elif days_left <= 3 %}🟠 Noch {{ days_left }} Tag(e)
+          {% else %}✓ Noch {{ days_left }} Tage
+          {% endif %}
+        </div>
+        {% endif %}
+      </form>
+    </div>
+
     <!-- Notes -->
     <div class="card">
       <div class="card-header"><div class="card-title">Notizen</div></div>
@@ -190,6 +220,10 @@
         <button class="btn btn-secondary btn-sm" data-label="Fachleute finden"
           onclick="requestAiAction('providers','{{ project.id }}','{{ stage.stage_key.value }}')">
           Fachleute finden
+        </button>
+        <button class="btn btn-secondary btn-sm" data-label="Dokument erstellen"
+          onclick="generateAiDocument('{{ project.id }}','{{ stage.stage_key.value }}')">
+          📄 Dokument per KI erstellen
         </button>
       </div>
 

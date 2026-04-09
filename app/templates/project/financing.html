@@ -100,6 +100,14 @@
 
       <button type="submit" class="btn btn-primary mt-16">Speichern</button>
     </form>
+    {% if fin and fin.bank_loan_amount and fin.bank_zinssatz and fin.laufzeit_years %}
+    <div style="margin-top:12px;">
+      <a href="{{ url_for('project.tilgungsplan', project_id=project.id) }}"
+         class="btn btn-secondary w-full" style="text-align:center;">
+        📊 Tilgungsplan anzeigen
+      </a>
+    </div>
+    {% endif %}
   </div>
 
   <!-- Summary + AI -->
