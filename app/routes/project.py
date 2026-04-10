@@ -10,7 +10,13 @@ from app.models.models import (
 from app.models.enums import (
     StageKey, StageStatus, ProjectType, DocType,
     STAGE_LABELS, STAGE_PHASES, FinancingStatus,
-    PROJECT_TYPE_LABELS, DOC_TYPE_LABELS
+    PROJECT_TYPE_LABELS, DOC_TYPE_LABELS,
+    STAGE_PROVIDER_CATEGORIES, PROVIDER_CATEGORY_LABELS
+)
+from app.services.agents import (
+    onboarding_chat, check_documents_for_stage,
+    check_finance_alerts, create_finance_outbox_messages,
+    build_stage_sequence,
 )
 from app.models.models import now_utc
 
@@ -97,6 +103,123 @@ def new():
                            project_type_labels=PROJECT_TYPE_LABELS)
 
 
+# ─── AI-geführtes Onboarding ──────────────────────────────────────────────────
+
+@project_bp.route('/onboard', methods=['GET'])
+@login_required
+def onboard():
+    """Zeigt die KI-Interview-Seite für neue Projekte."""
+    import json as _json
+    gemeinden = Gemeinde.query.filter_by(land='HE').order_by(Gemeinde.name).all()
+    stage_labels_json = _json.dumps({k.value: v for k, v in STAGE_LABELS.items()})
+    return render_template('project/onboarding.html',
+                           gemeinden=gemeinden,
+                           project_types=ProjectType,
+                           project_type_labels=PROJECT_TYPE_LABELS,
+                           stage_labels_json=stage_labels_json)
+
+
+@project_bp.route('/onboard/chat', methods=['POST'])
+@login_required
+def onboard_chat():
+    """AJAX-Endpunkt: verarbeitet einen Chat-Schritt des Onboarding-Agenten."""
+    data = request.get_json(silent=True) or {}
+    messages = data.get('messages', [])
+    if not messages:
+        return jsonify({'error': 'Keine Nachrichten'}), 400
+    if len(messages) > 30:
+        return jsonify({'error': 'Zu viele Nachrichten'}), 400
+
+    # Validate message structure
+    for m in messages:
+        if not isinstance(m, dict):
+            return jsonify({'error': 'Ungültige Nachricht'}), 400
+        if m.get('role') not in ('user', 'assistant'):
+            return jsonify({'error': 'Ungültige Rolle'}), 400
+        content = m.get('content', '')
+        if not isinstance(content, str) or len(content) > 2000:
+            return jsonify({'error': 'Nachricht zu lang'}), 400
+
+    result = onboarding_chat(messages)
+    return jsonify(result)
+
+
+@project_bp.route('/onboard/confirm', methods=['POST'])
+@login_required
+def onboard_confirm():
+    """Erstellt Projekt aus dem vom KI-Agenten erstellten Profil."""
+    import json as _json
+    data = request.get_json(silent=True) or {}
+    profile = data.get('profile', {})
+
+    if not profile:
+        return jsonify({'error': 'Kein Profil'}), 400
+
+    # Title aus Formular oder Vorschlag
+    title = (data.get('title') or profile.get('title_suggestion') or '').strip()
+    if not title:
+        title = 'Mein Bauprojekt'
+
+    seq = build_stage_sequence(profile)
+    current_stage = seq['current_stage']
+    completed_stages = seq['completed_stages']
+    project_type = seq['project_type']
+
+    gemeinde_id = data.get('gemeinde_id') or None
+    address_plz = (data.get('address_plz') or profile.get('address_plz') or '').strip()
+    address_city = (data.get('address_city') or profile.get('address_city') or '').strip()
+    budget_total = data.get('budget_total') or profile.get('budget_total')
+    wohnflaeche_m2 = data.get('wohnflaeche_m2') or profile.get('wohnflaeche_m2')
+    grundstueck_m2 = data.get('grundstueck_m2') or profile.get('grundstueck_m2')
+
+    project = Project(
+        user_id=current_user.id,
+        title=title,
+        project_type=project_type,
+        address_plz=address_plz,
+        address_city=address_city,
+        gemeinde_id=gemeinde_id,
+        budget_total=float(budget_total) if budget_total else None,
+        wohnflaeche_m2=float(wohnflaeche_m2) if wohnflaeche_m2 else None,
+        grundstueck_m2=float(grundstueck_m2) if grundstueck_m2 else None,
+        current_stage=current_stage,
+    )
+    db.session.add(project)
+    db.session.flush()
+
+    # Создаём этапы с правильными статусами
+    for phase_key, phase in STAGE_PHASES.items():
+        for stage_key in phase['stages']:
+            if stage_key in completed_stages:
+                status = StageStatus.DONE
+            elif stage_key == current_stage:
+                status = StageStatus.ACTIVE
+            else:
+                status = StageStatus.PENDING
+            stage = ProjectStage(
+                project_id=project.id,
+                stage_key=stage_key,
+                status=status,
+            )
+            db.session.add(stage)
+
+    # Пустой план финансирования
+    fin = FinancingPlan(
+        project_id=project.id,
+        status=FinancingStatus.DRAFT,
+    )
+    db.session.add(fin)
+    db.session.commit()
+
+    # Проверяем финансовые дедлайны и создаём уведомления
+    try:
+        create_finance_outbox_messages(project, current_user)
+    except Exception:
+        pass
+
+    return jsonify({'redirect': url_for('project.detail', project_id=project.id)})
+
+
 @project_bp.route('/<project_id>')
 @login_required
 def detail(project_id):
@@ -127,12 +250,27 @@ def detail(project_id):
         status='draft'
     ).count()
 
+    # Finance Agent — критические дедлайны
+    try:
+        finance_alerts = check_finance_alerts(project)
+    except Exception:
+        finance_alerts = []
+
+    # Document Agent — состояние документов текущего этапа
+    try:
+        from app.services.agents import check_documents
+        doc_status = check_documents(project)
+    except Exception:
+        doc_status = None
+
     return render_template('project/detail.html',
                            project=project,
                            phases=phases_with_stages,
                            stage_labels=STAGE_LABELS,
                            project_type_labels=PROJECT_TYPE_LABELS,
-                           pending_messages=pending_messages)
+                           pending_messages=pending_messages,
+                           finance_alerts=finance_alerts,
+                           doc_status=doc_status)
 
 
 @project_bp.route('/<project_id>/print')
@@ -187,6 +325,15 @@ def stage_detail(project_id, stage_key):
     outbox = stage.outbox_messages.all()
 
     from datetime import date as _date
+    # Provider categories for this stage
+    raw_cats = STAGE_PROVIDER_CATEGORIES.get(sk, [])
+    provider_categories = [
+        (cat.value, PROVIDER_CATEGORY_LABELS.get(cat, cat.value))
+        for cat in raw_cats
+    ]
+    # Document checklist from DocumentAgent
+    doc_check = check_documents_for_stage(project, sk)
+
     return render_template('project/stage.html',
                            project=project,
                            stage=stage,
@@ -195,6 +342,8 @@ def stage_detail(project_id, stage_key):
                            outbox=outbox,
                            doc_types=DocType,
                            doc_type_labels=DOC_TYPE_LABELS,
+                           provider_categories=provider_categories,
+                           doc_check=doc_check,
                            today=_date.today())
 
 
@@ -326,6 +475,8 @@ def tilgungsplan(project_id):
 
     return render_template('project/tilgungsplan.html',
                            project=project, rows=rows, summary=summary)
+
+@project_bp.route('/<project_id>/stage/<stage_key>/upload', methods=['POST'])
 @login_required
 def upload_document(project_id, stage_key):
     project = Project.query.filter_by(
@@ -525,4 +676,216 @@ def save_deadline(project_id, stage_key):
 
     db.session.commit()
     return redirect(url_for('project.stage_detail', project_id=project_id, stage_key=stage_key))
+
+
+# ─── Gmail Mailbox ─────────────────────────────────────────────────────────────
+
+@project_bp.route('/<project_id>/mailbox/save', methods=['POST'])
+@login_required
+def mailbox_save(project_id):
+    """Save or update Gmail credentials for a project."""
+    from app.models.models import ProjectMailbox
+    from app.services.gmail_service import encrypt_password, test_connection
+
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    gmail = request.form.get('gmail_address', '').strip().lower()
+    app_pwd = request.form.get('app_password', '').strip().replace(' ', '')
+
+    if not gmail or '@' not in gmail:
+        flash('Ungültige Gmail-Adresse.', 'danger')
+        return redirect(url_for('project.detail', project_id=project_id))
+
+    if not app_pwd or len(app_pwd) != 16:
+        flash('App-Passwort muss genau 16 Zeichen haben (Leerzeichen werden ignoriert).', 'danger')
+        return redirect(url_for('project.detail', project_id=project_id))
+
+    # Test connection before saving
+    result = test_connection(gmail, app_pwd)
+    if not result['success']:
+        flash(f'Verbindung fehlgeschlagen: {result["error"]}', 'danger')
+        return redirect(url_for('project.detail', project_id=project_id))
+
+    enc_pwd = encrypt_password(app_pwd)
+
+    mailbox = project.mailbox
+    if mailbox:
+        mailbox.gmail_address = gmail
+        mailbox.app_password_enc = enc_pwd
+        mailbox.is_active = True
+    else:
+        mailbox = ProjectMailbox(
+            project_id=project.id,
+            gmail_address=gmail,
+            app_password_enc=enc_pwd,
+        )
+        db.session.add(mailbox)
+
+    db.session.commit()
+    flash(f'Gmail {gmail} erfolgreich verbunden! ✓', 'success')
+    return redirect(url_for('project.detail', project_id=project_id))
+
+
+@project_bp.route('/<project_id>/mailbox/disconnect', methods=['POST'])
+@login_required
+def mailbox_disconnect(project_id):
+    """Deactivate mailbox connection."""
+    from app.models.models import ProjectMailbox
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+    if project.mailbox:
+        project.mailbox.is_active = False
+        db.session.commit()
+        flash('E-Mail-Verbindung getrennt.', 'info')
+    return redirect(url_for('project.detail', project_id=project_id))
+
+
+@project_bp.route('/<project_id>/mailbox/inbox')
+@login_required
+def mailbox_inbox(project_id):
+    """AJAX: fetch inbox from Gmail."""
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    if not project.mailbox or not project.mailbox.is_active:
+        return jsonify({'success': False, 'error': 'Kein Gmail-Konto verbunden.'})
+
+    from app.services.gmail_service import fetch_inbox
+    limit = min(int(request.args.get('limit', 30)), 50)
+    result = fetch_inbox(project.mailbox, limit=limit)
+    return jsonify(result)
+
+
+@project_bp.route('/<project_id>/mailbox/attachments/<uid>')
+@login_required
+def mailbox_fetch_attachments(project_id, uid):
+    """AJAX: list attachment filenames for an email."""
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    if not project.mailbox or not project.mailbox.is_active:
+        return jsonify({'success': False, 'error': 'Nicht verbunden.'})
+
+    from app.services.gmail_service import fetch_email_attachments
+    result = fetch_email_attachments(project.mailbox, uid)
+    # Return only metadata (no raw bytes)
+    attachments_meta = [
+        {'filename': a['filename'], 'content_type': a['content_type'], 'size': len(a['data'])}
+        for a in result.get('attachments', [])
+    ]
+    return jsonify({'success': result['success'], 'attachments': attachments_meta,
+                    'error': result.get('error')})
+
+
+@project_bp.route('/<project_id>/mailbox/save-attachment', methods=['POST'])
+@login_required
+def mailbox_save_attachment(project_id):
+    """
+    Download attachment from an email and save it as a Document in the project.
+    Body JSON: {uid, filename, stage_key (optional)}
+    """
+    import io
+    from app.services.gmail_service import fetch_email_attachments
+
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    if not project.mailbox or not project.mailbox.is_active:
+        return jsonify({'success': False, 'error': 'Nicht verbunden.'})
+
+    data = request.get_json() or {}
+    uid = data.get('uid', '')
+    target_filename = data.get('filename', '')
+    stage_key_str = data.get('stage_key', '')
+
+    if not uid or not target_filename:
+        return jsonify({'success': False, 'error': 'uid und filename erforderlich.'})
+
+    result = fetch_email_attachments(project.mailbox, uid)
+    if not result['success']:
+        return jsonify({'success': False, 'error': result['error']})
+
+    # Find the matching attachment by filename
+    attachment = next(
+        (a for a in result['attachments'] if a['filename'] == target_filename),
+        None
+    )
+    if not attachment:
+        return jsonify({'success': False, 'error': 'Anhang nicht gefunden.'})
+
+    # Determine stage
+    stage_id = None
+    if stage_key_str:
+        try:
+            sk = StageKey(stage_key_str)
+            stage_obj = project.stages.filter_by(stage_key=sk).first()
+            if stage_obj:
+                stage_id = stage_obj.id
+        except ValueError:
+            pass
+
+    # Save file to upload directory
+    upload_dir = os.path.join('uploads', project.id)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    ext = os.path.splitext(target_filename)[1].lower()
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+    file_path = os.path.join(upload_dir, stored_name)
+
+    with open(file_path, 'wb') as f:
+        f.write(attachment['data'])
+
+    doc = Document(
+        project_id=project.id,
+        stage_id=stage_id,
+        doc_type=DocType.SONSTIGES,
+        filename=stored_name,
+        original_filename=target_filename,
+        storage_path=file_path,
+        mime_type=attachment['content_type'],
+        size_bytes=len(attachment['data']),
+        generated_by_ai=False,
+        description='Via E-Mail importiert',
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    return jsonify({'success': True, 'doc_id': doc.id, 'filename': target_filename})
+
+
+@project_bp.route('/<project_id>/mailbox/send', methods=['POST'])
+@login_required
+def mailbox_send(project_id):
+    """Send an email via project Gmail mailbox."""
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    if not project.mailbox or not project.mailbox.is_active:
+        return jsonify({'success': False, 'error': 'Kein Gmail-Konto verbunden.'})
+
+    data = request.get_json() or {}
+    to_email = data.get('to', '').strip()
+    subject  = data.get('subject', '').strip()
+    body     = data.get('body', '').strip()
+
+    if not to_email or not subject or not body:
+        return jsonify({'success': False, 'error': 'Empfänger, Betreff und Nachricht erforderlich.'})
+
+    from app.services.gmail_service import send_via_mailbox
+    result = send_via_mailbox(
+        mailbox=project.mailbox,
+        to_email=to_email,
+        subject=subject,
+        body=body,
+        reply_to=project.mailbox.gmail_address,
+    )
+    return jsonify(result)
+
 

@@ -513,3 +513,78 @@ class FinancingPlan(db.Model):
             return P / n
         rate = P * r * (1 + r) ** n / ((1 + r) ** n - 1)
         return round(rate, 2)
+
+
+# ─────────────────────────────────────────────────────
+# MAILBOX DOMAIN
+# ─────────────────────────────────────────────────────
+
+class ProjectMailbox(db.Model):
+    """Gmail mailbox connected to a project (IMAP + SMTP via App Password)."""
+    __tablename__ = 'project_mailboxes'
+
+    id = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    project_id = db.Column(db.String(36), db.ForeignKey('projects.id'),
+                            nullable=False, unique=True, index=True)
+    gmail_address = db.Column(db.String(255), nullable=False)
+    # App password encrypted with Fernet (key derived from SECRET_KEY)
+    app_password_enc = db.Column(db.Text, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    last_sync_at = db.Column(db.DateTime(timezone=True))
+    email_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime(timezone=True), default=now_utc, nullable=False)
+
+    project = db.relationship('Project', backref=db.backref('mailbox', uselist=False))
+
+
+# ─────────────────────────────────────────────────────
+# LAW UPDATE AGENT DOMAIN
+# ─────────────────────────────────────────────────────
+
+class LawSource(db.Model):
+    """Tracked legal sources — German construction law / KfW programs / Hessen rules."""
+    __tablename__ = 'law_sources'
+
+    id = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    name = db.Column(db.String(255), nullable=False)         # e.g. "GEG 2024"
+    category = db.Column(db.String(100), nullable=False)     # e.g. "bundesrecht", "kfw", "hessen"
+    url = db.Column(db.String(1000), nullable=False)
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    last_checked_at = db.Column(db.DateTime(timezone=True))
+    last_changed_at = db.Column(db.DateTime(timezone=True))
+    last_hash = db.Column(db.String(64))                     # SHA-256 of fetched content
+    check_interval_days = db.Column(db.SmallInteger, default=30)
+    created_at = db.Column(db.DateTime(timezone=True), default=now_utc, nullable=False)
+
+    logs = db.relationship('LawUpdateLog', back_populates='source',
+                           order_by='LawUpdateLog.checked_at.desc()', lazy='dynamic')
+
+
+class LawUpdateLog(db.Model):
+    """Log of each law-check run for a source."""
+    __tablename__ = 'law_update_logs'
+
+    id = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    source_id = db.Column(db.String(36), db.ForeignKey('law_sources.id'),
+                          nullable=False, index=True)
+    checked_at = db.Column(db.DateTime(timezone=True), default=now_utc, nullable=False, index=True)
+    # 'no_change' | 'changed' | 'error'
+    result = db.Column(db.String(20), nullable=False, default='no_change')
+    previous_hash = db.Column(db.String(64))
+    current_hash = db.Column(db.String(64))
+    # AI-generated summary of what changed
+    change_summary = db.Column(db.Text)
+    # AI-generated suggestion for which STAGE_CONTEXTS need updating
+    affected_stages = db.Column(db.JSON)        # list of stage_key strings
+    suggested_update = db.Column(db.Text)       # AI-drafted update text for ai_service.py
+    # Admin review
+    requires_review = db.Column(db.Boolean, default=False, nullable=False)
+    reviewed_at = db.Column(db.DateTime(timezone=True))
+    reviewed_by = db.Column(db.String(100))     # admin email / "auto"
+    review_note = db.Column(db.Text)
+    applied = db.Column(db.Boolean, default=False, nullable=False)
+    error_message = db.Column(db.Text)
+
+    source = db.relationship('LawSource', back_populates='logs')
+

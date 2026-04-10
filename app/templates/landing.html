@@ -751,7 +751,7 @@
         </div>
       </div>
       <div style="flex-shrink:0;">
-        <a href="{{ url_for('provider_admin.register') }}" class="lnd-btn-primary" style="white-space:nowrap;font-size:14px;">
+        <a href="{{ url_for('providers.register_provider') }}" class="lnd-btn-primary" style="white-space:nowrap;font-size:14px;">
           Anbieter werden →
         </a>
       </div>
@@ -784,7 +784,7 @@
       <a href="{{ url_for('providers.index') }}">Alle Anbieter</a>
       <a href="{{ url_for('auth.register') }}">Registrieren</a>
       <a href="{{ url_for('auth.login') }}">Anmelden</a>
-      <a href="{{ url_for('provider_admin.register') }}">Anbieter-Portal</a>
+      <a href="{{ url_for('providers.register_provider') }}">Anbieter-Portal</a>
       <span style="color:#334155;margin:0 4px;">|</span>
       <a href="{{ url_for('legal.impressum') }}">Impressum</a>
       <a href="{{ url_for('legal.agb') }}">AGB</a>

@@ -710,27 +710,60 @@ FINANZIERUNG:
 
 # ─── Специализированные функции ───────────────────────────────────────────────
 
-def generate_bauamt_letter(project: Project, stage: ProjectStage, subject: str) -> dict:
+def generate_bauamt_letter(project: Project, stage: ProjectStage, subject: str, user=None) -> dict:
     """
     Генерирует черновик письма в Bauamt.
     Режим: CONFIRMATION_REQUIRED — пользователь утверждает перед отправкой.
     """
     gemeinde = project.gemeinde
-    prompt = f"""
-Erstelle einen professionellen Brief an das Bauaufsichtsamt {gemeinde.name if gemeinde else 'der zuständigen Gemeinde'}.
+    u = user or project.user
 
-Betreff: {subject}
-Bauherr: {project.user.full_name if project.user else 'N/A'}
-Vorhaben: {project.title}
-Adresse: {project.address}
+    # Sender data from user profile + project
+    sender_name    = (u.full_name if u else None) or 'Vorname Nachname'
+    sender_email   = (u.email    if u else None) or ''
+    sender_phone   = (u.phone    if u else None) or ''
+    sender_address = project.address or ''
+    sender_plz     = project.address_plz or ''
+    sender_city    = project.address_city or ''
 
-Der Brief soll:
-- Formal korrekt auf Deutsch sein
-- Den konkreten Sachverhalt erläutern  
-- Eine klare Anfrage oder Mitteilung enthalten
-- Mit freundlichem Gruß enden
+    # Recipient data from Gemeinde
+    recipient_name    = (gemeinde.bauamt_name    if gemeinde else None) or 'Bauaufsichtsbehörde'
+    recipient_address = (gemeinde.bauamt_address if gemeinde else None) or ''
+    recipient_city    = (gemeinde.name           if gemeinde else 'zuständige Gemeinde')
 
-Gib NUR den Brieftext zurück, ohne Erklärungen.
+    project_type_label = project.project_type.value.replace('_', ' ').title() if project.project_type else 'Neubau'
+
+    prompt = f"""Erstelle einen professionellen deutschen Behördenbrief (DIN 5008).
+
+BETREFF: {subject}
+
+ABSENDER:
+{sender_name}
+{sender_address}
+{sender_plz} {sender_city}
+{f'Tel.: {sender_phone}' if sender_phone else ''}
+{f'E-Mail: {sender_email}' if sender_email else ''}
+
+EMPFÄNGER:
+{recipient_name}
+{recipient_address}
+{recipient_city}
+
+VORHABEN:
+- Projektname: {project.title}
+- Typ: {project_type_label}
+- Grundstück: {sender_address}{f', {sender_plz} {sender_city}' if sender_plz else ''}
+- Wohnfläche: {project.wohnflaeche_m2 or '—'} m²
+- Grundstücksfläche: {project.grundstueck_m2 or '—'} m²
+{f'- Budget: {project.budget_total} €' if project.budget_total else ''}
+{f'- Bauzone: {project.zone.zone_label()}, GRZ {project.zone.grz_max}, GFZ {project.zone.gfz_max}' if project.zone else ''}
+
+ANFORDERUNGEN AN DEN BRIEF:
+- Formal korrekt nach DIN 5008
+- Mit vollständigem Briefkopf (Absender oben, Empfänger darunter, Datum: {__import__('datetime').date.today().strftime('%d.%m.%Y')})
+- Konkreter Sachverhalt und klare Anfrage/Mitteilung
+- Freundlicher Gruß am Ende mit Unterschrift-Zeile für {sender_name}
+- Gib NUR den fertigen Brieftext zurück, ohne Erklärungen oder Kommentare
 """
     result = ask_ai(
         user_message=prompt,

@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% block title %}Neues Projekt — KI-Assistent — BauNavigator{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Neues Projekt starten</h1>
+  <p class="page-subtitle">Unser KI-Assistent analysiert Ihre Situation und erstellt den optimalen Projektplan</p>
+</div>
+
+<div style="max-width:860px;margin:0 auto;">
+
+  <!-- Step indicator -->
+  <div class="flex gap-8 mb-20" id="step-indicator">
+    <div class="step-dot active" data-step="1">1. Interview</div>
+    <div class="step-sep">→</div>
+    <div class="step-dot" data-step="2">2. Profil bestätigen</div>
+    <div class="step-sep">→</div>
+    <div class="step-dot" data-step="3">3. Projekt erstellt</div>
+  </div>
+
+  <!-- STEP 1: Chat -->
+  <div id="step-chat">
+    <div class="grid-2" style="grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+
+      <!-- Chat window -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="background:var(--c-blue);padding:12px 16px;color:#fff;font-weight:600;font-size:14px;">
+          🤖 Bau-Max — Ihr Projekt-Assistent
+        </div>
+        <div id="chat-messages" style="
+          height:420px;overflow-y:auto;padding:16px;
+          display:flex;flex-direction:column;gap:12px;
+        ">
+          <!-- Messages injected by JS -->
+        </div>
+        <div style="border-top:1px solid var(--border);padding:12px;display:flex;gap-8;gap:8px;">
+          <input id="chat-input" type="text" class="form-control"
+                 placeholder="Tippen Sie Ihre Antwort..." autocomplete="off"
+                 style="flex:1;margin:0;">
+          <button id="chat-send" class="btn btn-primary" style="white-space:nowrap;">Senden</button>
+        </div>
+      </div>
+
+      <!-- Info sidebar -->
+      <div>
+        <div class="card mb-12" id="progress-card">
+          <div class="card-title" style="font-size:13px;margin-bottom:8px;">📋 Was wir noch brauchen</div>
+          <div id="checklist-items" style="font-size:12px;color:var(--text-m);line-height:1.8;">
+            <div class="checklist-item">○ Projekttyp</div>
+            <div class="checklist-item">○ Grundstück vorhanden?</div>
+            <div class="checklist-item">○ Baugenehmigung?</div>
+            <div class="checklist-item">○ Vorhandene Dokumente</div>
+            <div class="checklist-item">○ Standort (PLZ)</div>
+            <div class="checklist-item">○ Budget</div>
+          </div>
+        </div>
+
+        <div class="card" style="background:var(--c-blue-l,#eff6ff);border-color:var(--c-blue);">
+          <div style="font-size:12px;color:var(--text-m);line-height:1.7;">
+            <strong>Wie es funktioniert:</strong><br>
+            Bau-Max stellt Ihnen 6–8 gezielte Fragen zu Ihrem Bauvorhaben.
+            Basierend auf Ihren Antworten erstellt er automatisch den richtigen
+            Projektplan — mit dem passenden Einstiegspunkt und einer Dokumenten-Checkliste.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Profile confirmation (hidden initially) -->
+  <div id="step-profile" style="display:none;">
+    <div class="grid-2" style="grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+
+      <!-- AI summary -->
+      <div class="card" style="border-left:4px solid var(--c-blue);">
+        <div class="card-title">🎯 KI-Analyse: Ihr Projekt</div>
+        <div id="ai-summary" style="font-size:13px;color:var(--text-m);margin-bottom:16px;line-height:1.6;"></div>
+
+        <div style="font-size:12px;color:var(--text-s);margin-bottom:8px;">Erkannter Einstiegspunkt:</div>
+        <div id="detected-stage" class="badge badge-active" style="font-size:13px;padding:6px 12px;"></div>
+
+        <div id="finance-warnings-box" style="display:none;margin-top:16px;">
+          <div style="font-size:12px;font-weight:600;color:var(--c-coral);margin-bottom:6px;">⚠️ Wichtige Finanzierungs-Hinweise:</div>
+          <div id="finance-warnings-list" style="font-size:12px;color:var(--text-m);"></div>
+        </div>
+      </div>
+
+      <!-- Confirm form -->
+      <div class="card">
+        <div class="card-title">✏️ Details bestätigen & anpassen</div>
+        <input type="hidden" id="profile-json" value="">
+
+        <div class="form-group">
+          <label class="form-label">Projektname <span class="req">*</span></label>
+          <input type="text" id="confirm-title" class="form-control" required
+                 placeholder="z.B. Unser Neubau in Frankfurt">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">PLZ</label>
+            <input type="text" id="confirm-plz" class="form-control" placeholder="60311">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ort</label>
+            <input type="text" id="confirm-city" class="form-control" placeholder="Frankfurt am Main">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Budget (€)</label>
+            <input type="number" id="confirm-budget" class="form-control" placeholder="450000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Wohnfläche (m²)</label>
+            <input type="number" id="confirm-wohnflaeche" class="form-control" placeholder="150">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Gemeinde (Hessen)</label>
+          <select id="confirm-gemeinde" class="form-control">
+            <option value="">— optional —</option>
+            {% for g in gemeinden %}
+            <option value="{{ g.id }}">{{ g.name }} ({{ g.landkreis }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="flex gap-8 mt-12">
+          <button id="btn-create-project" class="btn btn-primary btn-lg">
+            🚀 Projekt erstellen
+          </button>
+          <button id="btn-back-chat" class="btn btn-secondary">← Zurück zum Chat</button>
+        </div>
+        <div id="creating-spinner" style="display:none;margin-top:10px;font-size:13px;color:var(--text-m);">
+          ⏳ Projekt wird erstellt...
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /max-width -->
+{% endblock %}
+
+{% block scripts %}
+<style>
+.step-dot {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-s);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+.step-dot.active {
+  background: var(--c-blue);
+  color: #fff;
+  border-color: var(--c-blue);
+}
+.step-dot.done {
+  background: var(--c-green, #16a34a);
+  color: #fff;
+  border-color: var(--c-green, #16a34a);
+}
+.step-sep { color: var(--text-s); line-height: 28px; }
+
+.chat-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+.chat-bubble.user {
+  align-self: flex-end;
+  background: var(--c-blue);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.chat-bubble.assistant {
+  align-self: flex-start;
+  background: var(--bg-card, #f8f9fa);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.chat-bubble.typing {
+  align-self: flex-start;
+  background: var(--bg-card, #f8f9fa);
+  border: 1px solid var(--border);
+  color: var(--text-s);
+  font-style: italic;
+}
+.checklist-item.done { color: var(--c-green, #16a34a); }
+</style>
+
+<script>
+const CSRF = document.querySelector('[data-csrf]')?.dataset.csrf || '';
+
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  messages: [],
+  profile: null,
+  answeredItems: new Set(),
+};
+
+const CHECKLIST_KEYS = [
+  { id: 'type',    label: 'Projekttyp',              keywords: ['neu', 'umbau', 'anbau', 'kauf', 'neubau', 'project'] },
+  { id: 'land',    label: 'Grundstück vorhanden?',   keywords: ['grundstück', 'grundstueck', 'участок', 'land'] },
+  { id: 'permit',  label: 'Baugenehmigung?',          keywords: ['genehmigung', 'permit', 'разрешение', 'antrag'] },
+  { id: 'docs',    label: 'Vorhandene Dokumente',     keywords: ['dokument', 'unterlag', 'vertrag', 'документ', 'бумаг'] },
+  { id: 'plz',     label: 'Standort (PLZ)',           keywords: ['plz', 'postleitzahl', 'adress', 'standort', 'индекс', 'город'] },
+  { id: 'budget',  label: 'Budget',                   keywords: ['budget', 'euro', 'kosten', 'бюджет', 'тысяч', '€'] },
+];
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+const messagesEl  = document.getElementById('chat-messages');
+const inputEl     = document.getElementById('chat-input');
+const sendBtn     = document.getElementById('chat-send');
+const checklistEl = document.getElementById('checklist-items');
+
+// ── Chat helpers ──────────────────────────────────────────────────────────
+function appendMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = `chat-bubble ${role}`;
+  div.innerHTML = text.replace(/\n/g, '<br>');
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'chat-bubble typing';
+  div.id = 'typing-indicator';
+  div.textContent = 'Bau-Max tippt…';
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+function hideTyping() {
+  document.getElementById('typing-indicator')?.remove();
+}
+
+function updateChecklist(text) {
+  const lower = text.toLowerCase();
+  CHECKLIST_KEYS.forEach(item => {
+    if (!state.answeredItems.has(item.id)) {
+      if (item.keywords.some(k => lower.includes(k))) {
+        state.answeredItems.add(item.id);
+      }
+    }
+  });
+  checklistEl.innerHTML = CHECKLIST_KEYS.map(item => {
+    const done = state.answeredItems.has(item.id);
+    return `<div class="checklist-item ${done ? 'done' : ''}">
+      ${done ? '✓' : '○'} ${item.label}
+    </div>`;
+  }).join('');
+}
+
+// ── Send message ───────────────────────────────────────────────────────────
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text || sendBtn.disabled) return;
+
+  inputEl.value = '';
+  sendBtn.disabled = true;
+  appendMessage('user', text);
+  updateChecklist(text);
+
+  state.messages.push({ role: 'user', content: text });
+  showTyping();
+
+  try {
+    const res = await fetch('/project/onboard/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ messages: state.messages }),
+    });
+    const data = await res.json();
+    hideTyping();
+
+    const reply = data.reply || 'Fehler beim Abruf.';
+    appendMessage('assistant', reply);
+    state.messages.push({ role: 'assistant', content: reply });
+    updateChecklist(reply);
+
+    if (data.profile) {
+      state.profile = data.profile;
+      setTimeout(() => showProfileStep(data.profile), 600);
+    }
+  } catch (e) {
+    hideTyping();
+    appendMessage('assistant', '⚠️ Verbindungsfehler. Bitte versuchen Sie es erneut.');
+  } finally {
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+}
+
+// ── Enter key ──────────────────────────────────────────────────────────────
+inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+sendBtn.addEventListener('click', sendMessage);
+
+// ── Show profile step ──────────────────────────────────────────────────────
+function showProfileStep(profile) {
+  document.getElementById('step-chat').style.display = 'none';
+  document.getElementById('step-profile').style.display = 'block';
+
+  // Update step indicator
+  document.querySelectorAll('.step-dot').forEach((d, i) => {
+    d.classList.toggle('active', i === 1);
+    d.classList.toggle('done',   i === 0);
+  });
+
+  // AI summary
+  document.getElementById('ai-summary').textContent = profile.summary || '';
+
+  // Current stage
+  const stageLabels = {{ stage_labels_json|safe }};
+  const stageLabel = stageLabels[profile.current_stage] || profile.current_stage;
+  document.getElementById('detected-stage').textContent = stageLabel;
+
+  // Finance warnings
+  if (profile.finance_warnings && profile.finance_warnings.length) {
+    const box = document.getElementById('finance-warnings-box');
+    const list = document.getElementById('finance-warnings-list');
+    list.innerHTML = profile.finance_warnings.map(w => `<div style="margin-bottom:4px;">• ${w}</div>`).join('');
+    box.style.display = 'block';
+  }
+
+  // Pre-fill form
+  document.getElementById('confirm-title').value = profile.title_suggestion || '';
+  document.getElementById('confirm-plz').value = profile.address_plz || '';
+  document.getElementById('confirm-city').value = profile.address_city || '';
+  if (profile.budget_total) document.getElementById('confirm-budget').value = profile.budget_total;
+  if (profile.wohnflaeche_m2) document.getElementById('confirm-wohnflaeche').value = profile.wohnflaeche_m2;
+
+  // Store profile JSON
+  document.getElementById('profile-json').value = JSON.stringify(profile);
+}
+
+// ── Back to chat ───────────────────────────────────────────────────────────
+document.getElementById('btn-back-chat').addEventListener('click', () => {
+  document.getElementById('step-profile').style.display = 'none';
+  document.getElementById('step-chat').style.display = 'block';
+  document.querySelectorAll('.step-dot').forEach((d, i) => {
+    d.classList.toggle('active', i === 0);
+    d.classList.remove('done');
+  });
+});
+
+// ── Create project ─────────────────────────────────────────────────────────
+document.getElementById('btn-create-project').addEventListener('click', async () => {
+  const title = document.getElementById('confirm-title').value.trim();
+  if (!title) {
+    alert('Bitte geben Sie einen Projektnamen ein.');
+    document.getElementById('confirm-title').focus();
+    return;
+  }
+
+  const profile = JSON.parse(document.getElementById('profile-json').value || '{}');
+  const payload = {
+    title,
+    profile,
+    address_plz:    document.getElementById('confirm-plz').value.trim(),
+    address_city:   document.getElementById('confirm-city').value.trim(),
+    budget_total:   document.getElementById('confirm-budget').value || null,
+    wohnflaeche_m2: document.getElementById('confirm-wohnflaeche').value || null,
+    gemeinde_id:    document.getElementById('confirm-gemeinde').value || null,
+  };
+
+  document.getElementById('btn-create-project').disabled = true;
+  document.getElementById('creating-spinner').style.display = 'block';
+
+  try {
+    const res = await fetch('/project/onboard/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.redirect) {
+      window.location.href = data.redirect;
+    } else {
+      alert(data.error || 'Fehler beim Erstellen des Projekts.');
+      document.getElementById('btn-create-project').disabled = false;
+      document.getElementById('creating-spinner').style.display = 'none';
+    }
+  } catch (e) {
+    alert('Verbindungsfehler. Bitte versuchen Sie es erneut.');
+    document.getElementById('btn-create-project').disabled = false;
+    document.getElementById('creating-spinner').style.display = 'none';
+  }
+});
+
+// ── Initial greeting ───────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const greeting = `Guten Tag! Ich bin Bau-Max, Ihr persönlicher BauNavigator-Assistent. 🏗️
+
+Ich begleite Sie durch den gesamten Bauprozess — von der Grundstückssuche bis zum Einzug.
+
+Um den optimalen Startpunkt für Ihr Projekt zu finden, habe ich ein paar kurze Fragen.
+
+Lassen Sie uns starten: Was planen Sie — einen **Neubau**, einen **Umbau/Sanierung**, einen **Anbau** oder den **Kauf einer Bestandsimmobilie**?`;
+
+  appendMessage('assistant', greeting);
+  state.messages.push({ role: 'assistant', content: greeting });
+  inputEl.focus();
+});
+</script>
+{% endblock %}

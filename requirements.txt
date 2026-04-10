@@ -18,3 +18,4 @@ stripe==10.4.0
 pillow==10.4.0
 gunicorn==22.0.0
 email-validator==2.2.0
+cryptography>=42.0.0

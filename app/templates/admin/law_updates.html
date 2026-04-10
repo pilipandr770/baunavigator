@@ -1,0 +1,275 @@
+{% extends 'admin/base.html' %}
+{% block title %}Gesetzesupdates — Admin{% endblock %}
+{% block page_title %}⚖ Law Update Agent{% endblock %}
+
+{% block content %}
+
+<!-- Stats row -->
+<div class="adm-stats" style="grid-template-columns:repeat(4,1fr);">
+  <div class="adm-stat">
+    <div class="adm-stat-num">{{ sources|length }}</div>
+    <div class="adm-stat-label">Quellen gesamt</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num" style="color:#f59e0b;">{{ pending_logs|length }}</div>
+    <div class="adm-stat-label">Ausstehende Reviews</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num" style="color:#3b82f6;">{{ recent_logs|length }}</div>
+    <div class="adm-stat-label">Änderungen erkannt</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num" style="color:#10b981;">
+      {{ sources|selectattr('is_active')|list|length }}
+    </div>
+    <div class="adm-stat-label">Aktive Quellen</div>
+  </div>
+</div>
+
+<!-- Action bar -->
+<div class="adm-card" style="padding:14px 20px;">
+  <div class="flex items-center gap-12" style="flex-wrap:wrap;">
+    <div style="flex:1;">
+      <span style="font-size:13px;font-weight:600;">Automatische Prüfung:</span>
+      <span style="font-size:12px;color:#64748b;margin-left:8px;">
+        Jeden 1. des Monats um 03:00 Uhr (APScheduler)
+      </span>
+    </div>
+    <form method="POST" action="{{ url_for('admin.law_updates_run') }}" style="display:inline;">
+      <button type="submit" class="btn-xs btn-activate" style="padding:7px 14px;font-size:12px;">
+        ▶ Fällige Quellen jetzt prüfen
+      </button>
+    </form>
+    <form method="POST" action="{{ url_for('admin.law_updates_run') }}" style="display:inline;">
+      <input type="hidden" name="force" value="1">
+      <button type="submit" class="btn-xs" style="padding:7px 14px;font-size:12px;background:#fee2e2;color:#991b1b;"
+              onclick="return confirm('Alle Quellen erzwungen prüfen? Das kann einige Minuten dauern.')">
+        ⚡ Alle Quellen erzwungen prüfen
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Pending reviews -->
+{% if pending_logs %}
+<div class="adm-card" style="border-left:4px solid #f59e0b;">
+  <h3>⚠️ Änderungen erkannt — Überprüfung erforderlich ({{ pending_logs|length }})</h3>
+  {% for log in pending_logs %}
+  <div style="
+    background:#fffbeb;border:1px solid #fde68a;border-radius:8px;
+    padding:14px;margin-bottom:12px;
+  ">
+    <div class="flex items-start gap-12">
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:13px;">
+          {{ log.source.name }}
+          <span class="badge badge-pending" style="margin-left:6px;">Änderung</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-top:3px;">
+          Erkannt: {{ log.checked_at.strftime('%d.%m.%Y %H:%M') }} UTC
+          · <a href="{{ log.source.url }}" target="_blank" rel="noopener" style="color:#3b82f6;">Quelle öffnen →</a>
+        </div>
+        {% if log.change_summary %}
+        <div style="font-size:12px;margin-top:8px;padding:8px;background:#fff;border-radius:5px;border:1px solid #e2e8f0;">
+          <strong>KI-Zusammenfassung:</strong> {{ log.change_summary }}
+        </div>
+        {% endif %}
+        {% if log.affected_stages %}
+        <div style="margin-top:8px;">
+          <span style="font-size:11px;color:#64748b;">Betroffene Etappen:</span>
+          {% for sk in log.affected_stages %}
+          <span class="badge badge-sent" style="font-size:10px;margin-left:4px;">{{ sk }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if log.suggested_update %}
+        <details style="margin-top:8px;">
+          <summary style="font-size:12px;cursor:pointer;color:#3b82f6;">KI-Vorschlag für STAGE_CONTEXTS</summary>
+          <pre style="font-size:11px;background:#f8fafc;padding:10px;border-radius:5px;margin-top:6px;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;">{{ log.suggested_update }}</pre>
+        </details>
+        {% endif %}
+      </div>
+
+      <!-- Review form -->
+      <form method="POST" action="{{ url_for('admin.law_updates_review', log_id=log.id) }}"
+            style="min-width:200px;">
+        <textarea name="note" placeholder="Notiz (optional)"
+          style="width:100%;font-size:12px;border:1px solid #e2e8f0;border-radius:5px;padding:6px;resize:vertical;min-height:50px;margin-bottom:8px;"></textarea>
+        <div class="flex gap-6">
+          <button type="submit" name="action" value="dismiss"
+            class="btn-xs btn-activate" style="flex:1;">✓ Geprüft</button>
+          <button type="submit" name="action" value="applied"
+            class="btn-xs" style="flex:1;background:#dbeafe;color:#1d4ed8;">
+            ✓ Angewendet
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Sources table -->
+<div class="adm-card">
+  <h3>📋 Überwachte Quellen</h3>
+  <table class="adm-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Kategorie</th>
+        <th>Letzte Prüfung</th>
+        <th>Letzte Änderung</th>
+        <th>Intervall</th>
+        <th>Status</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for src in sources %}
+      <tr>
+        <td>
+          <div style="font-weight:600;font-size:13px;">{{ src.name }}</div>
+          {% if src.description %}
+          <div style="font-size:11px;color:#94a3b8;">{{ src.description|truncate(80) }}</div>
+          {% endif %}
+          <a href="{{ src.url }}" target="_blank" rel="noopener"
+             style="font-size:10px;color:#3b82f6;">{{ src.url|truncate(50) }}</a>
+        </td>
+        <td>
+          <span class="badge" style="
+            background:{% if src.category == 'kfw' %}#dbeafe{% elif src.category == 'bundesrecht' %}#ede9fe{% elif src.category == 'hessen' %}#d1fae5{% elif src.category == 'bafa' %}#fef3c7{% else %}#f1f5f9{% endif %};
+            color:{% if src.category == 'kfw' %}#1d4ed8{% elif src.category == 'bundesrecht' %}#6d28d9{% elif src.category == 'hessen' %}#065f46{% elif src.category == 'bafa' %}#92400e{% else %}#475569{% endif %};
+          ">{{ src.category }}</span>
+        </td>
+        <td style="font-size:12px;color:#64748b;white-space:nowrap;">
+          {% if src.last_checked_at %}
+            {{ src.last_checked_at.strftime('%d.%m.%Y %H:%M') }}
+          {% else %}
+            <span style="color:#94a3b8;">Noch nie</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;white-space:nowrap;">
+          {% if src.last_changed_at %}
+            <span style="color:#f59e0b;font-weight:600;">
+              {{ src.last_changed_at.strftime('%d.%m.%Y') }}
+            </span>
+          {% else %}
+            <span style="color:#94a3b8;">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:#64748b;">{{ src.check_interval_days }}d</td>
+        <td>
+          {% if src.is_active %}
+          <span class="badge badge-verified">aktiv</span>
+          {% else %}
+          <span class="badge badge-suspended">inaktiv</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="flex gap-4" style="flex-wrap:wrap;">
+            <form method="POST" action="{{ url_for('admin.law_updates_check_one', source_id=src.id) }}" style="display:inline;">
+              <button type="submit" class="btn-xs btn-activate" title="Jetzt prüfen">▶</button>
+            </form>
+            <form method="POST" action="{{ url_for('admin.law_source_toggle', source_id=src.id) }}" style="display:inline;">
+              <button type="submit" class="btn-xs"
+                style="background:{% if src.is_active %}#fee2e2;color:#991b1b{% else %}#d1fae5;color:#065f46{% endif %};"
+                title="{% if src.is_active %}Deaktivieren{% else %}Aktivieren{% endif %}">
+                {% if src.is_active %}⏸{% else %}▶{% endif %}
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Recent changes log -->
+{% if recent_logs %}
+<div class="adm-card">
+  <h3>📜 Letzte erkannte Änderungen</h3>
+  <table class="adm-table">
+    <thead>
+      <tr>
+        <th>Datum</th><th>Quelle</th><th>Zusammenfassung</th><th>Etappen</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in recent_logs %}
+      <tr>
+        <td style="font-size:12px;white-space:nowrap;color:#64748b;">
+          {{ log.checked_at.strftime('%d.%m.%Y') }}
+        </td>
+        <td style="font-size:12px;font-weight:600;">{{ log.source.name }}</td>
+        <td style="font-size:12px;color:#374151;max-width:300px;">
+          {{ log.change_summary or '—' }}
+        </td>
+        <td style="font-size:11px;">
+          {% if log.affected_stages %}
+            {% for sk in log.affected_stages[:3] %}
+            <span class="badge badge-sent" style="font-size:10px;margin-right:2px;">{{ sk }}</span>
+            {% endfor %}
+            {% if log.affected_stages|length > 3 %}
+            <span style="color:#94a3b8;">+{{ log.affected_stages|length - 3 }}</span>
+            {% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if log.reviewed_at %}
+            <span class="badge badge-verified" style="font-size:10px;">
+              {% if log.applied %}angewendet{% else %}geprüft{% endif %}
+            </span>
+          {% elif log.requires_review %}
+            <span class="badge badge-pending" style="font-size:10px;">ausstehend</span>
+          {% else %}
+            <span class="badge" style="font-size:10px;background:#f1f5f9;color:#64748b;">auto</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Add custom source -->
+<div class="adm-card">
+  <h3>➕ Neue Quelle hinzufügen</h3>
+  <form method="POST" action="{{ url_for('admin.law_source_add') }}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Name *</label>
+        <input type="text" name="name" class="form-control" placeholder="z.B. VOB/B – Vergabe- und Vertragsordnung" required>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">URL * (https://)</label>
+        <input type="url" name="url" class="form-control" placeholder="https://www.gesetze-im-internet.de/..." required>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Kategorie</label>
+        <select name="category" class="form-control">
+          <option value="bundesrecht">Bundesrecht</option>
+          <option value="hessen">Hessen</option>
+          <option value="kfw">KfW</option>
+          <option value="bafa">BAFA</option>
+          <option value="sonstiges">Sonstiges</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Prüfintervall (Tage)</label>
+        <input type="number" name="interval" class="form-control" value="30" min="1" max="365">
+      </div>
+      <div style="grid-column:1/-1;">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Beschreibung</label>
+        <input type="text" name="description" class="form-control" placeholder="Kurze Beschreibung warum diese Quelle relevant ist">
+      </div>
+    </div>
+    <button type="submit" class="btn-xs btn-activate" style="margin-top:12px;padding:8px 16px;font-size:13px;">
+      Quelle hinzufügen
+    </button>
+  </form>
+</div>
+
+{% endblock %}

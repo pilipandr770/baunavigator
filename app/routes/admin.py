@@ -269,3 +269,162 @@ def _notify_provider(provider: Provider, activated: bool, reason: str = ''):
         mail.send(MailMsg(subject=subject, recipients=[provider.contact_email], body=body))
     except Exception:
         pass  # Email delivery is best-effort
+
+
+# ── Law Update Agent ─────────────────────────────────────────────────────────
+
+@admin_bp.route('/law-updates')
+@admin_required
+def law_updates():
+    """Übersicht: Gesetzesquellen und letzte Prüfergebnisse."""
+    from app.models.models import LawSource, LawUpdateLog
+    from app.services.law_agent import seed_default_sources
+
+    # Beim ersten Aufruf Standardquellen anlegen
+    seed_default_sources()
+
+    sources = LawSource.query.order_by(LawSource.category, LawSource.name).all()
+    pending_logs = (
+        LawUpdateLog.query
+        .filter_by(requires_review=True, reviewed_at=None)
+        .order_by(LawUpdateLog.checked_at.desc())
+        .all()
+    )
+    recent_logs = (
+        LawUpdateLog.query
+        .filter_by(result='changed')
+        .order_by(LawUpdateLog.checked_at.desc())
+        .limit(20).all()
+    )
+    return render_template('admin/law_updates.html',
+                           sources=sources,
+                           pending_logs=pending_logs,
+                           recent_logs=recent_logs)
+
+
+@admin_bp.route('/law-updates/run', methods=['POST'])
+@admin_required
+def law_updates_run():
+    """Manuell alle fälligen Quellen prüfen (oder alle wenn force=1)."""
+    from app.models.models import LawSource
+    from app.services.law_agent import check_source, seed_default_sources
+    from datetime import datetime, timezone, timedelta
+
+    seed_default_sources()
+    force = request.form.get('force') == '1'
+    sources = LawSource.query.filter_by(is_active=True).all()
+
+    checked = changed = errors = 0
+    now_utc = datetime.now(timezone.utc)
+
+    for src in sources:
+        if not force and src.last_checked_at:
+            next_check = src.last_checked_at.replace(tzinfo=timezone.utc) + \
+                         timedelta(days=src.check_interval_days)
+            if now_utc < next_check:
+                continue
+        try:
+            result = check_source(src)
+            checked += 1
+            if result['result'] == 'changed':
+                changed += 1
+            elif result['result'] == 'error':
+                errors += 1
+        except Exception as exc:
+            current_app.logger.error(f'law_updates_run error [{src.name}]: {exc}')
+            errors += 1
+
+    flash(
+        f'✅ Prüfung abgeschlossen: {checked} geprüft, {changed} geändert, {errors} Fehler.',
+        'success' if errors == 0 else 'warning',
+    )
+    return redirect(url_for('admin.law_updates'))
+
+
+@admin_bp.route('/law-updates/check-one/<source_id>', methods=['POST'])
+@admin_required
+def law_updates_check_one(source_id):
+    """Einzelne Quelle sofort prüfen."""
+    from app.models.models import LawSource
+    from app.services.law_agent import check_source
+
+    src = LawSource.query.get_or_404(source_id)
+    result = check_source(src)
+    flash(
+        f'Quelle „{src.name}": {result["result"]}',
+        'success' if result['result'] != 'error' else 'danger',
+    )
+    return redirect(url_for('admin.law_updates'))
+
+
+@admin_bp.route('/law-updates/review/<log_id>', methods=['POST'])
+@admin_required
+def law_updates_review(log_id):
+    """Admin markiert einen Änderungslog als geprüft."""
+    from app.models.models import LawUpdateLog, now_utc as _now
+
+    log = LawUpdateLog.query.get_or_404(log_id)
+    action = request.form.get('action', 'dismiss')
+    note = request.form.get('note', '').strip()
+
+    log.reviewed_at = _now()
+    log.reviewed_by = 'admin'
+    log.review_note = note or None
+    log.applied = (action == 'applied')
+    db.session.commit()
+
+    flash('Eintrag als geprüft markiert.', 'success')
+    return redirect(url_for('admin.law_updates'))
+
+
+@admin_bp.route('/law-updates/source/toggle/<source_id>', methods=['POST'])
+@admin_required
+def law_source_toggle(source_id):
+    """Quelle aktivieren / deaktivieren."""
+    from app.models.models import LawSource
+
+    src = LawSource.query.get_or_404(source_id)
+    src.is_active = not src.is_active
+    db.session.commit()
+    state = 'aktiviert' if src.is_active else 'deaktiviert'
+    flash(f'Quelle „{src.name}" {state}.', 'info')
+    return redirect(url_for('admin.law_updates'))
+
+
+@admin_bp.route('/law-updates/source/add', methods=['POST'])
+@admin_required
+def law_source_add():
+    """Neue benutzerdefinierte Quelle hinzufügen."""
+    from app.models.models import LawSource
+
+    name = request.form.get('name', '').strip()
+    url = request.form.get('url', '').strip()
+    category = request.form.get('category', 'sonstiges').strip()
+    description = request.form.get('description', '').strip()
+    interval = int(request.form.get('interval', 30) or 30)
+
+    if not name or not url:
+        flash('Name und URL sind Pflichtfelder.', 'danger')
+        return redirect(url_for('admin.law_updates'))
+
+    if not url.startswith('https://'):
+        flash('URL muss mit https:// beginnen.', 'danger')
+        return redirect(url_for('admin.law_updates'))
+
+    existing = LawSource.query.filter_by(url=url).first()
+    if existing:
+        flash('Diese URL ist bereits vorhanden.', 'warning')
+        return redirect(url_for('admin.law_updates'))
+
+    src = LawSource(
+        name=name,
+        url=url,
+        category=category,
+        description=description or None,
+        check_interval_days=max(1, min(365, interval)),
+    )
+    db.session.add(src)
+    db.session.commit()
+    flash(f'Quelle „{name}" hinzugefügt.', 'success')
+    return redirect(url_for('admin.law_updates'))
+

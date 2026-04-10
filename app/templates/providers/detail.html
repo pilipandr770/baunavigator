@@ -109,7 +109,6 @@
           <label class="form-label">Betreffender Bauschritt (optional)</label>
           <select name="stage_key" class="form-control">
             <option value="">— Allgemeine Anfrage —</option>
-            {% from 'components/stage_options.html' import stage_options_macro ignore missing %}
             {% for key, label in stage_labels_list %}
             <option value="{{ key }}">{{ label }}</option>
             {% endfor %}

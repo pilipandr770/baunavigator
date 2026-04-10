@@ -32,8 +32,16 @@ def init_scheduler(app):
         replace_existing=True,
         misfire_grace_time=3600,
     )
+    # Law Update Agent — runs on the 1st of every month at 03:00
+    _scheduler.add_job(
+        func=lambda: _run_law_agent(app),
+        trigger=CronTrigger(day=1, hour=3, minute=0),
+        id="law_updates",
+        replace_existing=True,
+        misfire_grace_time=7200,
+    )
     _scheduler.start()
-    logger.info("APScheduler started — deadline_reminders job registered.")
+    logger.info("APScheduler started — deadline_reminders + law_updates jobs registered.")
 
 
 def _send_deadline_reminders(app):
@@ -125,3 +133,20 @@ def _send_deadline_reminders(app):
 
         except Exception as exc:
             logger.error("Deadline reminder job error: %s", exc)
+
+
+def _run_law_agent(app):
+    """Monthly job: check all due law sources for content changes."""
+    with app.app_context():
+        try:
+            from app.services.law_agent import check_due_sources, seed_default_sources
+            # Ensure default sources exist
+            seed_default_sources()
+            stats = check_due_sources()
+            logger.info(
+                "Law update job done — checked:%d changed:%d errors:%d",
+                stats.get('checked', 0), stats.get('changed', 0), stats.get('errors', 0),
+            )
+        except Exception as exc:
+            logger.error("Law update job error: %s", exc)
+

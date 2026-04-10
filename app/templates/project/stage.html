@@ -203,8 +203,118 @@
 
   </div>
 
-  <!-- Right column: AI -->
+  <!-- Right column: info + AI -->
   <div>
+
+    <!-- Bauamt Links -->
+    {% if project.gemeinde %}
+    {% set g = project.gemeinde %}
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <div class="card-title">🏛 Behörden & Links</div>
+        <div class="card-subtitle">{{ g.name }}{% if g.landkreis %}, {{ g.landkreis }}{% endif %}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+        {% if g.bauamt_name %}
+        <div style="font-weight:600;color:var(--text);">{{ g.bauamt_name }}</div>
+        {% endif %}
+        {% if g.bauamt_address %}
+        <div style="color:var(--text-m);">📍 {{ g.bauamt_address }}</div>
+        {% endif %}
+        {% if g.bauamt_phone %}
+        <a href="tel:{{ g.bauamt_phone }}" style="color:var(--c-blue);text-decoration:none;">
+          📞 {{ g.bauamt_phone }}
+        </a>
+        {% endif %}
+        {% if g.bauamt_email %}
+        <a href="mailto:{{ g.bauamt_email }}" style="color:var(--c-blue);text-decoration:none;">
+          ✉ {{ g.bauamt_email }}
+        </a>
+        {% endif %}
+        {% if g.bauamt_url %}
+        <a href="{{ g.bauamt_url }}" target="_blank" rel="noopener"
+           style="color:var(--c-blue);text-decoration:none;">
+          🌐 Bauaufsicht-Website →
+        </a>
+        {% endif %}
+        {% if g.bauleitplan_portal_url %}
+        <a href="{{ g.bauleitplan_portal_url }}" target="_blank" rel="noopener"
+           style="color:var(--c-blue);text-decoration:none;">
+          🗺 Bauleitplan-Portal →
+        </a>
+        {% endif %}
+        {% if g.bauordnung_url %}
+        <a href="{{ g.bauordnung_url }}" target="_blank" rel="noopener"
+           style="color:var(--c-blue);text-decoration:none;">
+          📋 Bauordnung Hessen →
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Document Agent Checklist -->
+    {% if doc_check and doc_check.required %}
+    <div class="card" style="margin-bottom:16px;{% if doc_check.missing_critical > 0 %}border-left:4px solid var(--c-coral);{% elif doc_check.missing_total > 0 %}border-left:4px solid #f59e0b;{% else %}border-left:4px solid var(--c-green,#16a34a);{% endif %}">
+      <div class="card-title" style="font-size:13px;">
+        📁 Dokumente Checkliste
+        {% if doc_check.missing_critical > 0 %}
+        <span style="float:right;font-size:11px;color:var(--c-coral);">{{ doc_check.missing_critical }} Pflicht fehlt</span>
+        {% elif doc_check.missing_total == 0 %}
+        <span style="float:right;font-size:11px;color:var(--c-green,#16a34a);">✓ Vollständig</span>
+        {% else %}
+        <span style="float:right;font-size:11px;color:var(--text-s);">{{ doc_check.percent_complete }}%</span>
+        {% endif %}
+      </div>
+      <!-- progress bar -->
+      <div style="background:var(--border);border-radius:4px;height:5px;margin-bottom:10px;overflow:hidden;">
+        <div style="
+          height:100%;
+          width:{{ doc_check.percent_complete }}%;
+          background:{% if doc_check.missing_critical > 0 %}var(--c-coral){% elif doc_check.missing_total > 0 %}#f59e0b{% else %}var(--c-green,#16a34a){% endif %};
+        "></div>
+      </div>
+      {% for doc in doc_check.required %}
+      <div style="font-size:11px;display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">
+        <span style="margin-top:1px;flex-shrink:0;">
+          {% if doc.uploaded %}<span style="color:var(--c-green,#16a34a);">✓</span>
+          {% elif doc.critical %}<span style="color:var(--c-coral);">✗</span>
+          {% else %}<span style="color:var(--text-s);">○</span>{% endif %}
+        </span>
+        <div>
+          <span style="{% if not doc.uploaded and doc.critical %}font-weight:600;color:var(--c-coral);{% elif doc.uploaded %}color:var(--text-s);text-decoration:line-through;{% else %}color:var(--text-m);{% endif %}">
+            {{ doc.name }}{% if doc.critical %} <span style="font-size:9px;color:var(--c-coral);">PFLICHT</span>{% endif %}
+          </span>
+          {% if not doc.uploaded %}
+          <div style="color:var(--text-s);font-size:10px;margin-top:1px;">{{ doc.desc }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      <div style="font-size:11px;color:var(--text-s);margin-top:6px;">
+        * Laden Sie Dokumente über das Upload-Feld auf dieser Seite hoch
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Recommended Providers -->
+    {% if provider_categories %}
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <div class="card-title">🔧 Fachbetriebe für diesen Schritt</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        {% for cat_value, cat_label in provider_categories %}
+        <a href="{{ url_for('providers.index', category=cat_value, plz=project.address_plz or '') }}"
+           class="btn btn-secondary btn-sm" style="text-align:left;justify-content:flex-start;">
+          {{ cat_label }}
+          {% if project.address_plz %}<span style="margin-left:auto;font-size:10px;opacity:.6;">{{ project.address_plz }}</span>{% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="card" style="position:sticky;top:72px;">
       <div class="card-header">
         <div class="card-title">🤖 KI für diesen Schritt</div>

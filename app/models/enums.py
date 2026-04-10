@@ -312,6 +312,207 @@ PROVIDER_CATEGORY_LABELS = {
 }
 
 
+# ── Stage → empfohlene Fachbetrieb-Kategorien ────────────────────────────────
+STAGE_PROVIDER_CATEGORIES = {
+    StageKey.LAND_SEARCH:        [ProviderCategory.MAKLER, ProviderCategory.GUTACHTER],
+    StageKey.LAND_CHECK:         [ProviderCategory.GUTACHTER, ProviderCategory.NOTAR],
+    StageKey.FINANCING:          [ProviderCategory.ENERGIEBERATER],
+    StageKey.LAND_PURCHASE:      [ProviderCategory.NOTAR],
+    StageKey.ARCHITECT_SELECT:   [ProviderCategory.ARCHITEKT],
+    StageKey.DESIGN_PLANNING:    [ProviderCategory.ARCHITEKT, ProviderCategory.STATIKER, ProviderCategory.ENERGIEBERATER],
+    StageKey.BUILDING_PERMIT:    [ProviderCategory.ARCHITEKT, ProviderCategory.STATIKER],
+    StageKey.TENDERING:          [ProviderCategory.ARCHITEKT, ProviderCategory.BAUFIRMA],
+    StageKey.EARTHWORKS:         [ProviderCategory.BAUFIRMA, ProviderCategory.GUTACHTER],
+    StageKey.FOUNDATION:         [ProviderCategory.BAUFIRMA, ProviderCategory.STATIKER],
+    StageKey.WALLS_CEILINGS:     [ProviderCategory.BAUFIRMA],
+    StageKey.ROOF:               [ProviderCategory.HANDWERK_DACHDECKER, ProviderCategory.BAUFIRMA],
+    StageKey.WINDOWS_DOORS_RAW:  [ProviderCategory.BAUFIRMA],
+    StageKey.ELECTRICAL:         [ProviderCategory.HANDWERK_ELEKTRO],
+    StageKey.PLUMBING:           [ProviderCategory.HANDWERK_SANITAER],
+    StageKey.FLOORING:           [ProviderCategory.HANDWERK_BODENLEGER],
+    StageKey.TILING:             [ProviderCategory.HANDWERK_FLIESENLEGER],
+    StageKey.PLASTERING:         [ProviderCategory.HANDWERK_MALER],
+    StageKey.BUILT_IN_FURNITURE: [ProviderCategory.KUECHE_MOEBEL],
+    StageKey.LIGHTING:           [ProviderCategory.HANDWERK_ELEKTRO, ProviderCategory.SMARTHOME],
+    StageKey.DOORS_STAIRS:       [ProviderCategory.BAUFIRMA, ProviderCategory.HANDWERK_MALER],
+    StageKey.FACADE_INSULATION:  [ProviderCategory.BAUFIRMA, ProviderCategory.HANDWERK_MALER, ProviderCategory.ENERGIEBERATER],
+    StageKey.GARAGE:             [ProviderCategory.BAUFIRMA],
+    StageKey.GARDEN:             [ProviderCategory.GARTENBAUER],
+    StageKey.DRIVEWAY:           [ProviderCategory.BAUFIRMA, ProviderCategory.GARTENBAUER],
+    StageKey.FENCING:            [ProviderCategory.BAUFIRMA, ProviderCategory.GARTENBAUER],
+    StageKey.HEATING:            [ProviderCategory.HEIZUNG, ProviderCategory.ENERGIEBERATER],
+    StageKey.SOLAR_PV:           [ProviderCategory.PV_SOLAR],
+    StageKey.VENTILATION:        [ProviderCategory.HEIZUNG, ProviderCategory.HANDWERK_SANITAER],
+    StageKey.ENERGY_CERTIFICATE: [ProviderCategory.ENERGIEBERATER],
+    StageKey.SMART_HOME:         [ProviderCategory.SMARTHOME, ProviderCategory.HANDWERK_ELEKTRO],
+    StageKey.FINAL_ACCEPTANCE:   [ProviderCategory.GUTACHTER],
+    StageKey.OFFICIAL_NOTICES:   [],
+    StageKey.MOVE_IN:            [ProviderCategory.UMZUG],
+    StageKey.WARRANTY_TRACKING:  [ProviderCategory.GUTACHTER],
+}
+
+
+# ── Обязательные документы по этапам ─────────────────────────────────────────
+# Каждый элемент: {name, desc, critical}
+# critical=True — блокирующий документ, без него нельзя двигаться дальше
+STAGE_REQUIRED_DOCS = {
+    StageKey.LAND_SEARCH: [
+        {"name": "Bebauungsplan-Auszug",            "desc": "Nachweis Baurechte, Nutzungszone (B-Plan oder §34 BauGB)",   "critical": True},
+        {"name": "Bodenrichtwert-Auskunft (BORIS)",  "desc": "Aktuelle Bodenwerte Hessen",                                 "critical": False},
+        {"name": "Grundstücks-Exposé / Angebot",     "desc": "Angebotsdokument vom Makler oder Eigentümer",               "critical": False},
+    ],
+    StageKey.LAND_CHECK: [
+        {"name": "Bodengutachten",                   "desc": "Baugrunduntersuchung, Tragfähigkeit, Grundwasserstand",      "critical": True},
+        {"name": "Altlastenauskunft",                "desc": "Katasterauszug auf Altlasten (HLNUG Hessen)",                "critical": True},
+        {"name": "Grundbuchauszug",                  "desc": "Aktueller Grundbuchauszug (Lasten, Rechte, Eigentümer)",     "critical": True},
+        {"name": "Erschließungsnachweis",            "desc": "Bestätigung Wasser, Abwasser, Strom, Telekom verfügbar",     "critical": False},
+        {"name": "Kampfmittelfreiheitsbescheinigung","desc": "Hessischer Kampfmittelräumdienst (Pflicht Hessen)",          "critical": True},
+    ],
+    StageKey.FINANCING: [
+        {"name": "Finanzierungsbestätigung (Bank)",  "desc": "Vorläufige Finanzierungszusage der finanzierenden Bank",     "critical": True},
+        {"name": "KfW-Antragsdokumentation",         "desc": "KfW-Antrag VOR Baubeginn! (Programme 124, 261, 300)",       "critical": True},
+        {"name": "Eigenkapitalnachweis",             "desc": "Kontoauszug oder Depotauszug als EK-Nachweis",              "critical": True},
+        {"name": "Tilgungsplan",                     "desc": "Annuitäten-Tilgungsplan der Bank",                          "critical": False},
+    ],
+    StageKey.LAND_PURCHASE: [
+        {"name": "Notarieller Kaufvertrag",          "desc": "Beurkundeter Grundstückskaufvertrag (§311b BGB)",           "critical": True},
+        {"name": "Grunderwerbsteuer-Bescheid",       "desc": "Steuerbescheid Grunderwerbsteuer Hessen (6 %)",             "critical": True},
+        {"name": "Grundbucheintragung / Auflassung", "desc": "Auflassungsvormerkung im Grundbuch",                        "critical": True},
+        {"name": "Finanzierungsbestätigung (Final)", "desc": "Finale Darlehenszusage der Bank",                           "critical": True},
+    ],
+    StageKey.ARCHITECT_SELECT: [
+        {"name": "Architektenvertrag (HOAI)",         "desc": "Unterschriebener Architektenvertrag mit Leistungsphasen",  "critical": True},
+        {"name": "Kammermitgliedsnachweis Architekt","desc": "Nachweis Eintragung Architektenkammer Hessen (akh.de)",    "critical": True},
+    ],
+    StageKey.DESIGN_PLANNING: [
+        {"name": "Vorentwurf (LP 2) / Entwurf (LP 3)","desc": "Architektonische Vorentwurfs- und Entwurfsplanung",       "critical": True},
+        {"name": "GEG-Energievorberechnung",           "desc": "Nachweis Gebäudeenergiegesetz für Baugenehmigung",        "critical": True},
+        {"name": "Lageplan (amtlich M 1:500)",         "desc": "Amtlicher Lageplan vom Katasteramt",                     "critical": True},
+        {"name": "Abstandsflächennachweis",            "desc": "Nachweis §6 HBO Abstandsflächen",                        "critical": False},
+    ],
+    StageKey.BUILDING_PERMIT: [
+        {"name": "Bauantrag (vollständig)",           "desc": "Eingereichte und vollständige Antragsunterlagen §64 HBO",  "critical": True},
+        {"name": "Baugenehmigungsbescheid",           "desc": "Schriftlicher Genehmigungsbescheid der Bauaufsicht",       "critical": True},
+        {"name": "Statik / Standsicherheitsnachweis", "desc": "Geprüfte Standsicherheit vom Statiker",                   "critical": True},
+        {"name": "Entwässerungsplan",                 "desc": "Genehmigter Plan Untere Wasserbehörde",                   "critical": True},
+    ],
+    StageKey.TENDERING: [
+        {"name": "Leistungsverzeichnisse (LV)",       "desc": "LV je Gewerk vom Architekten erstellt",                   "critical": True},
+        {"name": "Min. 3 Angebote je Gewerk",         "desc": "Vergleichbare Bieterangebote",                            "critical": True},
+        {"name": "Vergabevermerk",                    "desc": "Dokumentation Vergabeentscheidung",                       "critical": False},
+        {"name": "Werkverträge / Bauverträge",        "desc": "Unterschriebene Verträge je Unternehmen",                 "critical": True},
+    ],
+    StageKey.EARTHWORKS: [
+        {"name": "Leitungsauskunft (vollständig)",    "desc": "Gas, Wasser, Strom, Telekom — vor Baubeginn Pflicht",     "critical": True},
+        {"name": "Baugenehmigung (Bauschild)",        "desc": "Original auf Baustelle aushängen (HBO §72)",              "critical": True},
+        {"name": "Bautagebuch Eröffnung",             "desc": "Start Bautagebuch-Führung",                               "critical": False},
+        {"name": "Entsorgungsnachweis Erdaushub",     "desc": "Schadstoffdokumentation Aushubmaterial",                  "critical": False},
+    ],
+    StageKey.FOUNDATION: [
+        {"name": "Statik Fundament",                  "desc": "Geprüfte Fundamentstatik vom Statiker",                  "critical": True},
+        {"name": "Abdichtungskonzept (DIN 18533)",    "desc": "Erdberührte Bauteile — Abdichtungsplanung",              "critical": True},
+        {"name": "Betonierprotokoll",                 "desc": "Dokumentation Betongüte, Schalung, Bewehrung",           "critical": False},
+    ],
+    StageKey.WALLS_CEILINGS: [
+        {"name": "Mauerwerk-Abnahmeprotokoll",        "desc": "Abnahme Rohbau-Außenwände vor Dachaufbau",              "critical": False},
+        {"name": "GEG U-Wert-Nachweis Außenwand",     "desc": "U-Wert ≤ 0,28 W/(m²K) für Außenwand",                  "critical": True},
+    ],
+    StageKey.ROOF: [
+        {"name": "Zimmerermannsvertrag",              "desc": "Vertrag mit eingetragenem Zimmerer",                     "critical": True},
+        {"name": "Dachkonstruktions-Statik",          "desc": "Standsicherheitsnachweis Dachstuhl (DIN 1052)",         "critical": True},
+        {"name": "Dachdeckungsprotokoll",             "desc": "Abnahmedokumentation Dachdecker",                      "critical": False},
+    ],
+    StageKey.WINDOWS_DOORS_RAW: [
+        {"name": "U-Wert-Nachweis Fenster/Türen",    "desc": "GEG: Fenster ≤ 1,3 W/(m²K), Tür ≤ 1,8 W/(m²K)",       "critical": True},
+        {"name": "RAL-Montageprotokoll",             "desc": "Fachgerechter Einbau nach RAL-Leitfaden",               "critical": False},
+    ],
+    StageKey.ELECTRICAL: [
+        {"name": "VDE-Protokoll",                    "desc": "Elektroabnahme nach VDE 0100 — vor Netzanschluss",      "critical": True},
+        {"name": "Netzanschlussantrag",              "desc": "Anmeldung beim Netzbetreiber",                          "critical": True},
+        {"name": "E-Plan (Stromkreisverteiler)",     "desc": "Schaltplan/Installationsplan",                         "critical": False},
+    ],
+    StageKey.PLUMBING: [
+        {"name": "Druckprüfprotokoll (10 bar, 30 min)","desc": "Druckprüfung Wasserleitungen vor Verputz",           "critical": True},
+        {"name": "Leitungsplan Sanitär",             "desc": "Dokumentation aller Wasserleitungen",                  "critical": True},
+        {"name": "Abnahme Hauswasseranschluss",      "desc": "Abnahme durch Netzbetreiber / Gemeinde",               "critical": True},
+    ],
+    StageKey.FLOORING: [
+        {"name": "Estrich-Protokoll",                "desc": "Dokumentation Estrichverlegung und Heizprotokoll",      "critical": True},
+        {"name": "CM-Messung Belegreife",            "desc": "Feuchtemessung vor Parkett/Vinyl (< 2 % CM)",          "critical": True},
+    ],
+    StageKey.TILING: [
+        {"name": "Verbundabdichtungs-Nachweis",      "desc": "Abdichtung Nassbereiche vor Fliesenverlegung",         "critical": True},
+    ],
+    StageKey.PLASTERING: [
+        {"name": "Abnahmeprotokoll Putz",            "desc": "Qualitätsstufe Q3/Q4 dokumentiert",                    "critical": False},
+    ],
+    StageKey.BUILT_IN_FURNITURE: [
+        {"name": "Küchenvertrag",                    "desc": "Bestätigter Auftrag Küche/Einbaumöbel",                "critical": False},
+    ],
+    StageKey.LIGHTING: [
+        {"name": "Beleuchtungsplan",                 "desc": "Elektrischen Installationsplan Beleuchtung",           "critical": False},
+    ],
+    StageKey.DOORS_STAIRS: [
+        {"name": "Abnahmeprotokoll Innentüren",      "desc": "Prüfung Schallschutz DIN 4109 + Brandschutz",         "critical": False},
+    ],
+    StageKey.FACADE_INSULATION: [
+        {"name": "WDVS-Übereinstimmungserklärung",   "desc": "CE-Kennzeichnung Dämmstoff WDVS",                     "critical": True},
+        {"name": "Energieberater-Bescheinigung",     "desc": "Nachweis GEG-Anforderungen Fassade",                  "critical": True},
+    ],
+    StageKey.GARAGE: [
+        {"name": "Genehmigung Garage/Carport",       "desc": "Baugenehmigung oder Freistellungsbescheid",            "critical": True},
+    ],
+    StageKey.GARDEN: [
+        {"name": "Bepflanzungsplan",                 "desc": "Sofern B-Plan Begrünung vorschreibt",                  "critical": False},
+    ],
+    StageKey.DRIVEWAY: [
+        {"name": "Entwässerungsantrag Zufahrt",      "desc": "Genehmigung Straßenentwässerung",                      "critical": False},
+    ],
+    StageKey.FENCING: [
+        {"name": "Genehmigung Einfriedung",          "desc": "Falls B-Plan Grenzabstand vorschreibt",                "critical": False},
+    ],
+    StageKey.HEATING: [
+        {"name": "GEG-konformer Heizungsnachweis",   "desc": "§71 GEG — 65 % erneuerbare Energie ab 2024",          "critical": True},
+        {"name": "BEG/BAFA-Förderantrag",            "desc": "Antrag KfW-458 oder BAFA — vor Einbau stellen!",      "critical": True},
+        {"name": "Inbetriebnahmeprotokoll Heizung",  "desc": "Herstellerprotokoll + Abnahme Schornsteinfeger",       "critical": True},
+    ],
+    StageKey.SOLAR_PV: [
+        {"name": "Netzanmeldung Marktstammdatenregister","desc": "Bundesnetzagentur — Pflicht nach EEG",             "critical": True},
+        {"name": "KfW-270-Antrag",                   "desc": "Vor Beauftragung stellen",                            "critical": False},
+        {"name": "PV-Abnahmeprotokoll",              "desc": "Netzbetreiber-Abnahme Einspeiseanlage",               "critical": True},
+    ],
+    StageKey.VENTILATION: [
+        {"name": "Lüftungskonzept (DIN 1946-6)",     "desc": "Pflichtnachweis für luftdichtes Gebäude",              "critical": True},
+        {"name": "Inbetriebnahmeprotokoll Lüftung",  "desc": "Luftmengenabgleich und Abnahme",                      "critical": False},
+    ],
+    StageKey.ENERGY_CERTIFICATE: [
+        {"name": "Energieausweis (Bedarfsausweis)",  "desc": "Ausgestellt von KfW-Experten nach GEG §79",           "critical": True},
+        {"name": "Blower-Door-Test-Protokoll",       "desc": "Luftdichtheitsmessung n50 ≤ 1,5 h⁻¹",                "critical": False},
+    ],
+    StageKey.SMART_HOME: [
+        {"name": "Smart-Home-Konfigurationsplan",    "desc": "Installationsplan Bussystem / Steuerlogik",            "critical": False},
+    ],
+    StageKey.FINAL_ACCEPTANCE: [
+        {"name": "Abnahmeprotokoll Bauabnahme",      "desc": "Gemeinsame Abnahme mit Bauleiter — Mängelliste",      "critical": True},
+        {"name": "Fertigstellungsanzeige",           "desc": "HBO §74 Fertigstellung anzeigen (Bauaufsicht)",       "critical": True},
+        {"name": "Sachverständigenprotokoll",        "desc": "Unabhängige Abnahme empfohlen (DEKRA/TÜV)",           "critical": False},
+    ],
+    StageKey.OFFICIAL_NOTICES: [
+        {"name": "Nutzungsänderungsanzeige",         "desc": "Falls Nutzung abweicht von Genehmigung",              "critical": False},
+        {"name": "Fertigstellungsanzeige eingereicht","desc": "Eingangsbestätigung Bauaufsicht",                    "critical": True},
+    ],
+    StageKey.MOVE_IN: [
+        {"name": "Ummeldebescheinigung",             "desc": "Anmeldung neuer Wohnsitz beim Einwohnermeldeamt",     "critical": True},
+        {"name": "Versicherungsnachweis Wohngebäude","desc": "Wohngebäudeversicherung ab Einzug aktiv",            "critical": True},
+        {"name": "Zählerstandsprotokoll",            "desc": "Strom- und Gaszähler-Ablesedokumentation",            "critical": False},
+    ],
+    StageKey.WARRANTY_TRACKING: [
+        {"name": "Mängelliste & Nachbesserungs-Protokolle","desc": "Dokumentation aller gemeldeten Mängel",        "critical": False},
+        {"name": "Gewährleistungsfristen-Übersicht", "desc": "je Gewerk (i.d.R. 5 Jahre nach BGB §634a)",          "critical": True},
+    ],
+}
+
+
 class LicenseType(str, enum.Enum):
     MEISTERBRIEF = 'meisterbrief'
     KAMMERMITGLIED = 'kammermitglied'

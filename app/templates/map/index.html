@@ -31,6 +31,7 @@
       </div>
     </div>
     <div id="zone-info" class="hidden" style="margin-top:16px;"></div>
+    <div id="bauamt-info" style="margin-top:16px;display:none;padding:10px;background:var(--c-blue-l);border-radius:var(--radius);display:flex;flex-direction:column;gap:3px;"></div>
     <div id="map-actions" class="hidden" style="margin-top:16px;">
       <button class="btn btn-primary w-full" id="btn-ai-zone">KI: Zone analysieren</button>
     </div>
@@ -116,6 +117,25 @@ function selectGemeinde(g) {
 
   if (g.lat && g.lng) map.setView([g.lat, g.lng], 12);
 
+  // ── Bauamt contact block ──────────────────────────────────────────────────
+  const bauamtEl = document.getElementById('bauamt-info');
+  if (bauamtEl) {
+    const lines = [];
+    if (g.bauamt_name)    lines.push(`<div style="font-weight:600;">${g.bauamt_name}</div>`);
+    if (g.bauamt_address) lines.push(`<div style="color:var(--text-m);font-size:11px;">📍 ${g.bauamt_address}</div>`);
+    if (g.bauamt_phone)   lines.push(`<a href="tel:${g.bauamt_phone}" style="color:var(--c-blue);font-size:12px;">📞 ${g.bauamt_phone}</a>`);
+    if (g.bauamt_email)   lines.push(`<a href="mailto:${g.bauamt_email}" style="color:var(--c-blue);font-size:12px;">✉ ${g.bauamt_email}</a>`);
+    if (g.bauamt_url)     lines.push(`<a href="${g.bauamt_url}" target="_blank" rel="noopener" style="color:var(--c-blue);font-size:12px;">🌐 Bauaufsicht-Website →</a>`);
+    if (g.bauleitplan_portal_url) lines.push(`<a href="${g.bauleitplan_portal_url}" target="_blank" rel="noopener" style="color:var(--c-blue);font-size:12px;">🗺 Bauleitplan-Portal →</a>`);
+    if (g.bauordnung_url) lines.push(`<a href="${g.bauordnung_url}" target="_blank" rel="noopener" style="color:var(--c-blue);font-size:12px;">📋 Bauordnung Hessen →</a>`);
+    bauamtEl.style.display = lines.length ? '' : 'none';
+    bauamtEl.innerHTML = lines.length
+      ? `<div style="font-size:11px;font-weight:600;color:var(--text-m);margin-bottom:6px;">🏛 Bauamt</div>`
+        + lines.map(l => `<div style="margin-bottom:3px;">${l}</div>`).join('')
+      : '';
+  }
+
+  // ── Zones ─────────────────────────────────────────────────────────────────
   fetch(`/map/api/gemeinde/${g.id}/zones`)
     .then(r => r.json())
     .then(zones => {
@@ -125,11 +145,12 @@ function selectGemeinde(g) {
         el.innerHTML = '<p class="text-small text-muted">Keine Bebauungsplan-Zonen in der Datenbank.</p>';
         return;
       }
-      el.innerHTML = `<div class="card-title text-small mb-8">Zonen (${zones.length})</div>` +
+      el.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text-m);margin-bottom:6px;">📐 Bebauungszonen (${zones.length})</div>` +
         zones.map(z => `
           <div style="padding:6px 8px;border-radius:4px;background:var(--c-gray-l);margin-bottom:4px;font-size:11px;">
             <strong>${z.zone_type}</strong> — ${z.zone_label}<br>
             GRZ: ${z.grz_max || '—'} · GFZ: ${z.gfz_max || '—'} · Max ${z.max_geschosse || '?'} Geschosse
+            ${z.max_hoehe_m ? `· Höhe max. ${z.max_hoehe_m} m` : ''}
           </div>
         `).join('');
     });
@@ -214,18 +235,5 @@ function switchTab(tab) {
     gemeindeMarkers.forEach(m => m.addTo(map));
   }
 }
-</script>
-{% endblock %}
-            <strong>${z.zone_type}</strong> — ${z.zone_label}<br>
-            GRZ: ${z.grz_max || '—'} · GFZ: ${z.gfz_max || '—'} · Max ${z.max_geschosse || '?'} Geschosse
-          </div>
-        `).join('');
-    });
-}
-
-document.getElementById('btn-ai-zone')?.addEventListener('click', () => {
-  if (!selectedGemeinde) return;
-  alert('Bitte zuerst ein Projekt öffnen und die Zone dort analysieren.');
-});
 </script>
 {% endblock %}

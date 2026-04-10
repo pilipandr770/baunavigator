@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from sqlalchemy import cast, Text
 from flask_login import login_required, current_user
 from app import db
 from app.models.models import (
@@ -211,7 +212,7 @@ def draft_letter(project_id, stage_key):
 
     stage = project.stages.filter_by(stage_key=sk).first()
     subject = request.get_json().get('subject', f'Anfrage zu {STAGE_LABELS.get(sk)}')
-    result = generate_bauamt_letter(project, stage, subject)
+    result = generate_bauamt_letter(project, stage, subject, user=current_user)
     return jsonify(result)
 
 
@@ -409,19 +410,42 @@ def delete(message_id):
 
 
 def _send_outbox_message(msg: MessageOutbox):
-    """Реальная отправка через Flask-Mail."""
-    from flask_mail import Message as MailMessage
-    from app import mail
+    """
+    Send an outbox message.
+    If the project has a connected Gmail mailbox, use it (sends from project email).
+    Otherwise fall back to Flask-Mail (system sender).
+    """
     from app.models.models import now_utc
     try:
-        email_msg = MailMessage(
-            subject=msg.subject,
-            recipients=[msg.recipient_email],
-            body=msg.body_draft,
-        )
-        mail.send(email_msg)
-        msg.status = OutboxStatus.SENT
-        msg.sent_at = now_utc()
+        project = msg.project
+        if project and project.mailbox and project.mailbox.is_active:
+            # Send via project Gmail
+            from app.services.gmail_service import send_via_mailbox
+            result = send_via_mailbox(
+                mailbox=project.mailbox,
+                to_email=msg.recipient_email,
+                subject=msg.subject,
+                body=msg.body_draft,
+            )
+            if result['success']:
+                msg.status = OutboxStatus.SENT
+                msg.sent_at = now_utc()
+            else:
+                msg.status = OutboxStatus.FAILED
+                msg.error_log = result.get('error', 'Gmail-Fehler')
+        else:
+            # Fall back to Flask-Mail (system sender)
+            from flask_mail import Message as MailMessage
+            from app import mail
+            email_msg = MailMessage(
+                subject=msg.subject,
+                recipients=[msg.recipient_email],
+                body=msg.body_draft,
+            )
+            mail.send(email_msg)
+            msg.status = OutboxStatus.SENT
+            msg.sent_at = now_utc()
+
         db.session.commit()
     except Exception as e:
         msg.status = OutboxStatus.FAILED
@@ -449,8 +473,13 @@ def api_gemeinden():
         'name': g.name,
         'landkreis': g.landkreis,
         'ags': g.ags_code,
+        'bauamt_name': g.bauamt_name,
         'bauamt_email': g.bauamt_email,
+        'bauamt_phone': g.bauamt_phone,
+        'bauamt_address': g.bauamt_address,
         'bauamt_url': g.bauamt_url,
+        'bauleitplan_portal_url': g.bauleitplan_portal_url,
+        'bauordnung_url': g.bauordnung_url,
         'lat': float(g.lat) if g.lat else None,
         'lng': float(g.lng) if g.lng else None,
     } for g in gemeinden])
@@ -554,7 +583,7 @@ def index():
         if not category:
             query = query.join(ProviderService)
         query = query.filter(
-            ProviderService.service_area_plz.contains(plz)
+            cast(ProviderService.service_area_plz, Text).contains(plz)
         ).distinct()
 
     providers = query.order_by(Provider.rating_avg.desc()).limit(50).all()

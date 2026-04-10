@@ -87,8 +87,143 @@
     {% endfor %}
   </div>
 
-  <!-- Right: AI Chat -->
+  <!-- Right: Agents + Mailbox + AI Chat -->
   <div>
+
+    <!-- ── Finance Agent — критические предупреждения ──────── -->
+    {% if finance_alerts %}
+    <div class="card mb-16" style="border-left:4px solid var(--c-coral);">
+      <div class="card-title" style="font-size:13px;color:var(--c-coral);">⚠️ Finance-Agent: Dringende Hinweise</div>
+      {% for alert in finance_alerts %}
+      <div style="
+        font-size:12px;padding:8px;border-radius:6px;margin-top:8px;
+        background:{% if alert.level == 'critical' %}rgba(239,68,68,0.07){% else %}rgba(251,191,36,0.1){% endif %};
+        border:1px solid {% if alert.level == 'critical' %}rgba(239,68,68,0.3){% else %}rgba(251,191,36,0.4){% endif %};
+      ">
+        <div style="font-weight:600;margin-bottom:3px;color:{% if alert.level == 'critical' %}var(--c-coral){% else %}#b45309{% endif %};">
+          {% if alert.level == 'critical' %}🚨{% else %}⚠️{% endif %} {{ alert.stage_label }}
+        </div>
+        <div style="color:var(--text-m);">{{ alert.message }}</div>
+        <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=alert.stage_key) }}"
+           style="font-size:11px;color:var(--c-blue);display:inline-block;margin-top:4px;">
+          Zum Abschnitt →
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ── Document Agent — статус документов ──────────────── -->
+    {% if doc_status and doc_status.required %}
+    <div class="card mb-16">
+      <div class="card-title" style="font-size:13px;">📁 Dokumente: {{ doc_status.stage_label }}</div>
+      <div class="flex items-center gap-8 mb-8">
+        <div style="flex:1;background:var(--border);border-radius:4px;height:6px;overflow:hidden;">
+          <div style="background:{% if doc_status.missing_critical > 0 %}var(--c-coral){% elif doc_status.missing_total > 0 %}#f59e0b{% else %}var(--c-green,#16a34a){% endif %};height:100%;width:{{ doc_status.percent_complete }}%;transition:width .3s;"></div>
+        </div>
+        <span style="font-size:11px;color:var(--text-s);white-space:nowrap;">
+          {{ doc_status.percent_complete }}%
+        </span>
+      </div>
+      {% if doc_status.missing_critical > 0 %}
+      <div style="font-size:11px;color:var(--c-coral);margin-bottom:6px;">
+        {{ doc_status.missing_critical }} fehlende Pflichtdokument(e)
+      </div>
+      {% endif %}
+      <div id="doc-list-preview">
+        {% for doc in doc_status.required[:4] %}
+        <div style="font-size:11px;display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+          {% if doc.uploaded %}
+          <span style="color:var(--c-green,#16a34a);">✓</span>
+          {% elif doc.critical %}
+          <span style="color:var(--c-coral);">✗</span>
+          {% else %}
+          <span style="color:var(--text-s);">○</span>
+          {% endif %}
+          <span style="color:var(--text-m);{% if not doc.uploaded and doc.critical %}font-weight:600;{% endif %}">
+            {{ doc.name }}{% if doc.critical %} *{% endif %}
+          </span>
+        </div>
+        {% endfor %}
+        {% if doc_status.required|length > 4 %}
+        <div style="font-size:11px;color:var(--text-s);margin-top:4px;">
+          + {{ doc_status.required|length - 4 }} weitere...
+        </div>
+        {% endif %}
+      </div>
+      <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=doc_status.stage_key) }}"
+         class="btn btn-sm btn-secondary mt-8" style="font-size:11px;">Alle Dokumente ansehen</a>
+    </div>
+    {% endif %}
+
+    <!-- ── Gmail Mailbox Card ────────────────────────────────── -->
+    <div class="card mb-16" id="mailbox-card">
+      <div class="card-header flex items-center gap-8">
+        <div class="card-title">📧 Projekt-E-Mail</div>
+        {% if project.mailbox and project.mailbox.is_active %}
+        <span class="badge badge-active ml-auto">Verbunden</span>
+        {% endif %}
+      </div>
+
+      {% if project.mailbox and project.mailbox.is_active %}
+      <!-- Connected state -->
+      <div style="font-size:13px;margin-bottom:10px;">
+        <div style="color:var(--text-m);">{{ project.mailbox.gmail_address }}</div>
+        {% if project.mailbox.last_sync_at %}
+        <div class="text-small text-muted">
+          Zuletzt synchronisiert: {{ project.mailbox.last_sync_at.strftime('%d.%m.%Y %H:%M') }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="flex gap-8" style="flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="openInbox('{{ project.id }}')">
+          📥 Posteingang öffnen
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="openCompose('{{ project.id }}')">
+          ✉ Neue E-Mail
+        </button>
+        <form method="POST" action="{{ url_for('project.mailbox_disconnect', project_id=project.id) }}"
+              style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-sm"
+                  style="color:var(--c-coral);border-color:var(--c-coral);"
+                  onclick="return confirm('Gmail-Verbindung trennen?')">Trennen</button>
+        </form>
+      </div>
+
+      {% else %}
+      <!-- Setup form -->
+      <div style="font-size:12px;color:var(--text-m);margin-bottom:10px;">
+        Verbinden Sie eine Gmail-Adresse, damit der Agent E-Mails senden, empfangen und
+        Dokumente automatisch importieren kann.
+      </div>
+      <form method="POST" action="{{ url_for('project.mailbox_save', project_id=project.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label">Gmail-Adresse</label>
+          <input type="email" name="gmail_address" class="form-control"
+                 placeholder="projekt@gmail.com" required>
+        </div>
+        <div class="form-group" style="margin-bottom:4px;">
+          <label class="form-label">
+            App-Passwort (16 Zeichen)
+            <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener"
+               style="font-size:11px;color:var(--c-blue);margin-left:6px;">
+              Wie bekomme ich es? →
+            </a>
+          </label>
+          <input type="password" name="app_password" class="form-control"
+                 placeholder="xxxx xxxx xxxx xxxx" maxlength="19" required
+                 pattern="[a-zA-Z0-9 ]{16,19}">
+          <div class="text-small text-muted mt-4">
+            Google-Konto → Sicherheit → 2-Schritt-Verifizierung → App-Passwörter
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm mt-8">Verbinden & testen</button>
+      </form>
+      {% endif %}
+    </div>
+
     <div class="card" style="position:sticky;top:72px;">
       <div class="card-header">
         <div class="card-title">🤖 KI-Assistent</div>
@@ -145,5 +280,172 @@
 {% block scripts %}
 <script>
 AiChat.init('{{ project.id }}', '{{ project.current_stage.value }}');
+</script>
+
+<!-- ── Inbox Modal ───────────────────────────────────────────────────────── -->
+<div id="inbox-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;overflow-y:auto;">
+  <div style="background:#fff;max-width:800px;margin:32px auto;border-radius:var(--radius-lg);box-shadow:0 8px 40px rgba(0,0,0,.25);overflow:hidden;">
+    <div style="display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--c-blue);color:#fff;">
+      <span style="font-size:15px;font-weight:600;">📥 Posteingang — {{ project.title }}</span>
+      <button onclick="closeInbox()" style="margin-left:auto;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:16px;">
+      <div id="inbox-loading" style="text-align:center;padding:40px;color:var(--text-m);">
+        ⏳ E-Mails werden geladen…
+      </div>
+      <div id="inbox-list" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Compose Modal ─────────────────────────────────────────────────────── -->
+<div id="compose-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9001;">
+  <div style="background:#fff;max-width:560px;margin:60px auto;border-radius:var(--radius-lg);box-shadow:0 8px 40px rgba(0,0,0,.25);overflow:hidden;">
+    <div style="display:flex;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--c-blue);color:#fff;">
+      <span style="font-size:15px;font-weight:600;">✉ Neue E-Mail senden</span>
+      <button onclick="closeCompose()" style="margin-left:auto;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:10px;">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">An</label>
+        <input type="email" id="compose-to" class="form-control" placeholder="empfaenger@email.de">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Betreff</label>
+        <input type="text" id="compose-subject" class="form-control" placeholder="Betreff">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Nachricht</label>
+        <textarea id="compose-body" class="form-control" rows="8" style="resize:vertical;"></textarea>
+      </div>
+      <div class="flex gap-8">
+        <button onclick="sendCompose('{{ project.id }}')" class="btn btn-primary">Senden</button>
+        <button onclick="closeCompose()" class="btn btn-secondary">Abbrechen</button>
+        <span id="compose-status" style="font-size:12px;color:var(--text-m);align-self:center;"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Inbox ─────────────────────────────────────────────────────────────────────
+function openInbox(projectId) {
+  document.getElementById('inbox-modal').style.display = 'block';
+  document.getElementById('inbox-loading').style.display = 'block';
+  document.getElementById('inbox-list').style.display = 'none';
+
+  fetch(`/project/${projectId}/mailbox/inbox?limit=30`, {
+    headers: { 'X-CSRFToken': getCsrfToken() }
+  })
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('inbox-loading').style.display = 'none';
+    const list = document.getElementById('inbox-list');
+    list.style.display = 'block';
+
+    if (!data.success) {
+      list.innerHTML = `<div style="color:var(--c-coral);padding:20px;">${data.error}</div>`;
+      return;
+    }
+    if (!data.emails.length) {
+      list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-m);">Posteingang ist leer.</div>';
+      return;
+    }
+
+    list.innerHTML = data.emails.map(e => `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;">
+        <div style="padding:10px 14px;cursor:pointer;background:var(--c-gray-l);"
+             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-weight:600;flex:1;font-size:13px;">${escHtml(e.subject || '(kein Betreff)')}</span>
+            ${e.attachments.length ? `<span style="font-size:11px;color:var(--c-blue);">📎 ${e.attachments.length}</span>` : ''}
+            <span style="font-size:11px;color:var(--text-m);">${new Date(e.date_iso).toLocaleDateString('de-DE')}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-m);">Von: ${escHtml(e.from)}</div>
+        </div>
+        <div style="display:none;padding:12px 14px;">
+          <pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;margin-bottom:10px;max-height:200px;overflow-y:auto;">${escHtml(e.body)}</pre>
+          ${e.attachments.length ? `
+            <div style="border-top:1px solid var(--border);padding-top:10px;">
+              <div style="font-size:11px;font-weight:600;color:var(--text-m);margin-bottom:6px;">Anhänge:</div>
+              ${e.attachments.map(a => `
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                  <span style="font-size:12px;">📎 ${escHtml(a.filename)}</span>
+                  <button onclick="saveAttachment('${projectId}','${e.uid}','${escHtml(a.filename)}')"
+                          class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 8px;">
+                    Speichern
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `).join('');
+  });
+}
+
+function closeInbox() {
+  document.getElementById('inbox-modal').style.display = 'none';
+}
+
+function saveAttachment(projectId, uid, filename) {
+  const csrf = getCsrfToken();
+  fetch(`/project/${projectId}/mailbox/save-attachment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+    body: JSON.stringify({ uid, filename })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) showToast(`„${filename}" als Dokument gespeichert ✓`, 'success');
+    else showToast(d.error || 'Fehler', 'danger');
+  });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Compose ───────────────────────────────────────────────────────────────────
+function openCompose(projectId, to, subject, body) {
+  document.getElementById('compose-to').value      = to      || '';
+  document.getElementById('compose-subject').value = subject || '';
+  document.getElementById('compose-body').value    = body    || '';
+  document.getElementById('compose-status').textContent = '';
+  document.getElementById('compose-modal').style.display = 'block';
+}
+
+function closeCompose() {
+  document.getElementById('compose-modal').style.display = 'none';
+}
+
+function sendCompose(projectId) {
+  const to      = document.getElementById('compose-to').value.trim();
+  const subject = document.getElementById('compose-subject').value.trim();
+  const body    = document.getElementById('compose-body').value.trim();
+  const status  = document.getElementById('compose-status');
+
+  if (!to || !subject || !body) { status.textContent = 'Alle Felder ausfüllen.'; return; }
+  status.textContent = 'Wird gesendet…';
+
+  fetch(`/project/${projectId}/mailbox/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+    body: JSON.stringify({ to, subject, body })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      closeCompose();
+      showToast('E-Mail gesendet ✓', 'success');
+    } else {
+      status.textContent = d.error || 'Fehler beim Senden.';
+    }
+  });
+}
+
+// Expose globally for stage.html "Brief an Buildamt" button
+window.openComposeModal = openCompose;
 </script>
 {% endblock %}
