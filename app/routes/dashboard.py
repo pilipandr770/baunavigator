@@ -13,8 +13,9 @@ dashboard_bp = Blueprint('dashboard', __name__)
 
 
 @dashboard_bp.route('/')
-@login_required
 def index():
+    if not current_user.is_authenticated:
+        return render_template('landing.html')
     projects = (
         Project.query
         .filter_by(user_id=current_user.id, is_active=True)

@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BauNavigator — Ihr digitaler Baubegleiter für Hessen</title>
+  <meta name="description" content="BauNavigator führt Sie durch alle 35 Bauphasen — mit KI-Unterstützung, verifizierten Fachleuten und automatisierten Deadlines.">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <style>
+    /* ── Landing-only styles ─────────────────────────────── */
+    :root {
+      --lnd-dark:   #0f172a;
+      --lnd-dark2:  #1e293b;
+      --lnd-blue:   #2563eb;
+      --lnd-blue2:  #1d4ed8;
+      --lnd-indigo: #4f46e5;
+      --lnd-teal:   #0d9488;
+      --lnd-amber:  #d97706;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body { background: #fff; overflow-x: hidden; }
+
+    /* ── Nav ─────────────────────────── */
+    .lnd-nav {
+      position: sticky; top: 0; z-index: 200;
+      background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .lnd-nav-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 24px; height: 60px;
+    }
+    .lnd-brand {
+      display: flex; align-items: center; gap: 8px;
+      text-decoration: none; font-weight: 800; font-size: 17px;
+      color: var(--lnd-blue); letter-spacing: -.4px; margin-right: auto;
+    }
+    .lnd-brand-icon { font-size: 22px; }
+    .lnd-nav a.nav-text {
+      text-decoration: none; font-size: 13px; color: #475569;
+      padding: 6px 12px; border-radius: 7px; transition: background .15s;
+    }
+    .lnd-nav a.nav-text:hover { background: #f1f5f9; color: #0f172a; }
+    .lnd-nav-cta {
+      background: var(--lnd-blue); color: #fff !important;
+      padding: 8px 18px !important; border-radius: 8px !important;
+      font-weight: 600 !important; font-size: 13px !important;
+    }
+    .lnd-nav-cta:hover { background: var(--lnd-blue2) !important; }
+
+    /* ── Hero ────────────────────────── */
+    .lnd-hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a6e 50%, #1d4ed8 100%);
+      min-height: 88vh;
+      display: flex; align-items: center;
+      overflow: hidden; position: relative;
+      padding: 80px 24px;
+    }
+    .lnd-hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 70% 50%, rgba(79,70,229,.25) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    /* grid pattern */
+    .lnd-hero::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      pointer-events: none;
+    }
+    .lnd-hero-inner {
+      max-width: 1200px; margin: 0 auto; width: 100%;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
+      align-items: center; position: relative; z-index: 1;
+    }
+    .lnd-hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: rgba(37,99,235,.25); border: 1px solid rgba(99,140,255,.3);
+      color: #93c5fd; font-size: 12px; font-weight: 600;
+      padding: 5px 12px; border-radius: 20px; margin-bottom: 24px;
+      letter-spacing: .04em; text-transform: uppercase;
+    }
+    .lnd-hero-h1 {
+      font-size: clamp(32px, 4vw, 52px); font-weight: 800;
+      color: #fff; line-height: 1.12; letter-spacing: -.8px;
+      margin-bottom: 20px;
+    }
+    .lnd-hero-h1 span { color: #60a5fa; }
+    .lnd-hero-sub {
+      font-size: 17px; color: #cbd5e1; line-height: 1.65;
+      margin-bottom: 36px; max-width: 480px;
+    }
+    .lnd-hero-btns { display: flex; gap: 14px; flex-wrap: wrap; }
+    .lnd-btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--lnd-blue); color: #fff;
+      padding: 14px 28px; border-radius: 10px;
+      font-size: 15px; font-weight: 700;
+      text-decoration: none; transition: all .2s;
+      box-shadow: 0 8px 24px rgba(37,99,235,.4);
+    }
+    .lnd-btn-primary:hover { background: var(--lnd-blue2); transform: translateY(-1px); box-shadow: 0 12px 32px rgba(37,99,235,.5); }
+    .lnd-btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,.08); color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,.15);
+      padding: 14px 26px; border-radius: 10px;
+      font-size: 15px; font-weight: 600;
+      text-decoration: none; transition: all .2s;
+    }
+    .lnd-btn-ghost:hover { background: rgba(255,255,255,.14); color: #fff; }
+    .lnd-hero-trust {
+      display: flex; gap: 20px; margin-top: 36px; flex-wrap: wrap;
+    }
+    .lnd-trust-item {
+      display: flex; align-items: center; gap: 7px;
+      color: #94a3b8; font-size: 12px; font-weight: 500;
+    }
+    .lnd-trust-item span { color: #4ade80; font-size: 14px; }
+
+    /* Hero right — dashboard mockup */
+    .lnd-hero-mockup {
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 16px; padding: 20px; backdrop-filter: blur(6px);
+    }
+    .lnd-mock-bar {
+      display: flex; gap: 6px; margin-bottom: 14px;
+    }
+    .lnd-mock-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .lnd-mock-stage {
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .lnd-mock-stage.done { border-color: rgba(74,222,128,.2); }
+    .lnd-mock-stage.active { background: rgba(37,99,235,.15); border-color: rgba(96,165,250,.3); }
+    .lnd-mock-check { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+    .lnd-mock-text { color: #e2e8f0; font-size: 13px; font-weight: 500; flex: 1; }
+    .lnd-mock-stage.done .lnd-mock-text { color: #94a3b8; text-decoration: line-through; }
+    .lnd-mock-badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      font-weight: 600; text-transform: uppercase;
+    }
+    .lnd-mock-badge.done { background: rgba(74,222,128,.15); color: #4ade80; }
+    .lnd-mock-badge.active { background: rgba(96,165,250,.2); color: #60a5fa; }
+    .lnd-mock-badge.upcoming { background: rgba(148,163,184,.1); color: #94a3b8; }
+    .lnd-mock-ai {
+      margin-top: 14px; background: rgba(99,102,241,.15);
+      border: 1px solid rgba(99,102,241,.25); border-radius: 8px; padding: 12px;
+    }
+    .lnd-mock-ai-label { font-size: 10px; color: #a5b4fc; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    .lnd-mock-ai-text { font-size: 12px; color: #c7d2fe; line-height: 1.5; }
+
+    /* ── Stat bar ─────────────────────── */
+    .lnd-stats {
+      background: var(--lnd-dark2);
+      padding: 28px 24px;
+    }
+    .lnd-stats-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    }
+    .lnd-stat {
+      text-align: center; padding: 0 24px;
+      border-right: 1px solid rgba(255,255,255,.08);
+    }
+    .lnd-stat:last-child { border-right: none; }
+    .lnd-stat-num { font-size: 36px; font-weight: 800; color: #60a5fa; letter-spacing: -1px; }
+    .lnd-stat-label { font-size: 12px; color: #94a3b8; margin-top: 4px; font-weight: 500; }
+
+    /* ── Sections generic ─────────────── */
+    .lnd-section { padding: 88px 24px; }
+    .lnd-section.gray { background: #f8fafc; }
+    .lnd-section-inner { max-width: 1200px; margin: 0 auto; }
+    .lnd-section-eyebrow {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--lnd-blue); margin-bottom: 12px;
+    }
+    .lnd-section-title {
+      font-size: clamp(24px, 3vw, 38px); font-weight: 800;
+      color: #0f172a; letter-spacing: -.5px; line-height: 1.2;
+      margin-bottom: 14px;
+    }
+    .lnd-section-sub {
+      font-size: 17px; color: #475569; max-width: 600px; line-height: 1.65;
+    }
+    .lnd-section-head { margin-bottom: 52px; }
+
+    /* ── Feature grid ─────────────────── */
+    .lnd-features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+    .lnd-feature-card {
+      background: #fff; border: 1px solid #e2e8f0;
+      border-radius: 14px; padding: 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      transition: all .2s;
+    }
+    .lnd-feature-card:hover { border-color: #bfdbfe; box-shadow: 0 6px 20px rgba(37,99,235,.1); transform: translateY(-2px); }
+    .lnd-feature-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 16px;
+    }
+    .lnd-feature-icon.blue   { background: #eff6ff; }
+    .lnd-feature-icon.purple { background: #f5f3ff; }
+    .lnd-feature-icon.teal   { background: #f0fdfa; }
+    .lnd-feature-icon.amber  { background: #fffbeb; }
+    .lnd-feature-title { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    .lnd-feature-text { font-size: 14px; color: #475569; line-height: 1.65; }
+    .lnd-feature-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+    .lnd-tag {
+      font-size: 11px; padding: 3px 9px; border-radius: 12px;
+      background: #f1f5f9; color: #475569; font-weight: 500;
+    }
+
+    /* ── How it works ─────────────────── */
+    .lnd-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; position: relative; }
+    .lnd-steps::before {
+      content: '';
+      position: absolute; top: 28px; left: calc(16.5% + 16px); right: calc(16.5% + 16px);
+      height: 2px; background: linear-gradient(90deg, #2563eb, #4f46e5);
+      z-index: 0;
+    }
+    .lnd-step { text-align: center; position: relative; z-index: 1; }
+    .lnd-step-num {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--lnd-blue), var(--lnd-indigo));
+      color: #fff; font-size: 20px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px; box-shadow: 0 4px 16px rgba(37,99,235,.35);
+    }
+    .lnd-step-title { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    .lnd-step-text { font-size: 14px; color: #475569; line-height: 1.6; }
+
+    /* ── Why us / comparison ─────────────── */
+    .lnd-compare {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    }
+    .lnd-compare-col {
+      border-radius: 14px; padding: 28px;
+    }
+    .lnd-compare-col.them {
+      background: #f8fafc; border: 1px solid #e2e8f0;
+    }
+    .lnd-compare-col.us {
+      background: linear-gradient(135deg, #1e3a6e, #1d4ed8);
+      color: #fff;
+    }
+    .lnd-compare-label {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; margin-bottom: 20px;
+    }
+    .lnd-compare-col.them .lnd-compare-label { color: #94a3b8; }
+    .lnd-compare-col.us   .lnd-compare-label { color: #93c5fd; }
+    .lnd-compare-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+    .lnd-compare-item:last-child { margin-bottom: 0; }
+    .lnd-ci-icon { font-size: 16px; width: 20px; flex-shrink: 0; margin-top: 1px; }
+    .lnd-ci-text { font-size: 14px; line-height: 1.5; }
+    .lnd-compare-col.them .lnd-ci-text { color: #64748b; }
+    .lnd-compare-col.us   .lnd-ci-text { color: #e2e8f0; }
+
+    /* ── Pricing ─────────────────────────── */
+    .lnd-pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .lnd-plan {
+      border: 2px solid #e2e8f0; border-radius: 16px; padding: 28px;
+      background: #fff; position: relative; transition: all .2s;
+    }
+    .lnd-plan:hover { border-color: var(--lnd-blue); box-shadow: 0 8px 28px rgba(37,99,235,.12); }
+    .lnd-plan.popular {
+      border-color: var(--lnd-blue);
+      box-shadow: 0 8px 28px rgba(37,99,235,.18);
+    }
+    .lnd-plan-badge {
+      position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+      background: linear-gradient(90deg, var(--lnd-blue), var(--lnd-indigo));
+      color: #fff; font-size: 11px; font-weight: 700; padding: 4px 14px;
+      border-radius: 12px; text-transform: uppercase; letter-spacing: .05em;
+      white-space: nowrap;
+    }
+    .lnd-plan-name { font-size: 14px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+    .lnd-plan-price { font-size: 40px; font-weight: 800; color: #0f172a; letter-spacing: -1px; margin-bottom: 4px; }
+    .lnd-plan-price small { font-size: 15px; font-weight: 500; color: #94a3b8; }
+    .lnd-plan-desc { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    .lnd-plan-features { list-style: none; margin-bottom: 28px; }
+    .lnd-plan-features li {
+      font-size: 13px; color: #374151; padding: 5px 0;
+      display: flex; gap: 8px; align-items: flex-start;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .lnd-plan-features li:last-child { border-bottom: none; }
+    .lnd-plan-features li::before { content: '✓'; color: var(--lnd-blue); font-weight: 700; flex-shrink: 0; }
+    .lnd-plan-cta {
+      display: block; text-align: center; padding: 11px;
+      border-radius: 9px; font-size: 14px; font-weight: 700;
+      text-decoration: none; transition: all .15s;
+    }
+    .lnd-plan-cta.outline {
+      border: 2px solid var(--lnd-blue); color: var(--lnd-blue);
+    }
+    .lnd-plan-cta.outline:hover { background: var(--lnd-blue); color: #fff; }
+    .lnd-plan-cta.solid {
+      background: var(--lnd-blue); color: #fff;
+      box-shadow: 0 4px 14px rgba(37,99,235,.35);
+    }
+    .lnd-plan-cta.solid:hover { background: var(--lnd-blue2); }
+
+    /* ── Provider CTA Banner ──────────────── */
+    .lnd-provider-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      border-radius: 20px; padding: 52px 48px;
+      display: grid; grid-template-columns: 1fr auto; gap: 40px;
+      align-items: center;
+    }
+    .lnd-provider-banner h2 {
+      font-size: 28px; font-weight: 800; color: #fff; margin-bottom: 10px; letter-spacing: -.3px;
+    }
+    .lnd-provider-banner p { font-size: 15px; color: #94a3b8; line-height: 1.6; max-width: 520px; }
+    .lnd-provider-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+    .lnd-ptag {
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+      color: #cbd5e1; font-size: 12px; padding: 4px 12px; border-radius: 20px; font-weight: 500;
+    }
+
+    /* ── Final CTA ────────────────────── */
+    .lnd-final {
+      background: linear-gradient(135deg, var(--lnd-blue) 0%, var(--lnd-indigo) 100%);
+      text-align: center; padding: 96px 24px;
+    }
+    .lnd-final h2 {
+      font-size: clamp(26px, 3.5vw, 44px); font-weight: 800;
+      color: #fff; letter-spacing: -.5px; margin-bottom: 14px;
+    }
+    .lnd-final p { font-size: 18px; color: #bfdbfe; margin-bottom: 36px; max-width: 500px; margin-left: auto; margin-right: auto; }
+    .lnd-final-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .lnd-btn-white {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #fff; color: var(--lnd-blue);
+      padding: 14px 32px; border-radius: 10px;
+      font-size: 16px; font-weight: 700; text-decoration: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,.2); transition: all .2s;
+    }
+    .lnd-btn-white:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(0,0,0,.25); }
+    .lnd-btn-outline-white {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: transparent; color: #fff;
+      border: 2px solid rgba(255,255,255,.4);
+      padding: 14px 28px; border-radius: 10px;
+      font-size: 16px; font-weight: 600; text-decoration: none; transition: all .2s;
+    }
+    .lnd-btn-outline-white:hover { border-color: #fff; background: rgba(255,255,255,.08); }
+
+    /* ── Footer ──────────────────────── */
+    .lnd-footer {
+      background: var(--lnd-dark); padding: 40px 24px;
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+    .lnd-footer-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+    }
+    .lnd-footer-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .lnd-footer-brand span { font-size: 18px; }
+    .lnd-footer-brand strong { font-size: 14px; color: #e2e8f0; font-weight: 700; }
+    .lnd-footer-sub { font-size: 12px; color: #64748b; margin-top: 3px; }
+    .lnd-footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+    .lnd-footer-links a { font-size: 13px; color: #64748b; text-decoration: none; transition: color .15s; }
+    .lnd-footer-links a:hover { color: #e2e8f0; }
+
+    /* ── Responsive ─────────────────── */
+    @media (max-width: 900px) {
+      .lnd-hero-inner { grid-template-columns: 1fr; gap: 40px; }
+      .lnd-hero-mockup { display: none; }
+      .lnd-features { grid-template-columns: 1fr; }
+      .lnd-steps { grid-template-columns: 1fr; }
+      .lnd-steps::before { display: none; }
+      .lnd-compare { grid-template-columns: 1fr; }
+      .lnd-pricing { grid-template-columns: 1fr; }
+      .lnd-provider-banner { grid-template-columns: 1fr; text-align: center; padding: 36px 24px; }
+      .lnd-provider-tags { justify-content: center; }
+      .lnd-stats-inner { grid-template-columns: repeat(2,1fr); }
+      .lnd-stat { border-right: none; border-bottom: 1px solid rgba(255,255,255,.08); padding: 16px 0; }
+      .lnd-stat:nth-child(2n) { border-bottom: 1px solid rgba(255,255,255,.08); }
+      .lnd-stat:last-child { border-bottom: none; }
+    }
+    @media (max-width: 600px) {
+      .lnd-hero { padding: 60px 20px; min-height: auto; }
+      .lnd-section { padding: 56px 20px; }
+      .lnd-nav-inner { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────────────────────── -->
+<nav class="lnd-nav">
+  <div class="lnd-nav-inner">
+    <a href="{{ url_for('dashboard.index') }}" class="lnd-brand">
+      <span class="lnd-brand-icon">⌂</span>
+      BauNavigator
+    </a>
+    <a href="{{ url_for('map.index') }}" class="nav-text">Fachleute-Karte</a>
+    <a href="{{ url_for('providers.index') }}" class="nav-text">Anbieter</a>
+    <a href="{{ url_for('auth.login') }}" class="nav-text">Anmelden</a>
+    <a href="{{ url_for('auth.register') }}" class="nav-text lnd-nav-cta">Kostenlos starten</a>
+  </div>
+</nav>
+
+<!-- ── HERO ────────────────────────────────────────────────────────── -->
+<section class="lnd-hero">
+  <div class="lnd-hero-inner">
+    <div>
+      <div class="lnd-hero-eyebrow">
+        <span>🏠</span> Für Bauherren in Hessen
+      </div>
+      <h1 class="lnd-hero-h1">
+        Ihr Hausbau —<br>
+        <span>strukturiert,<br>digital,</span><br>
+        stressfrei.
+      </h1>
+      <p class="lnd-hero-sub">
+        BauNavigator führt Sie durch alle <strong style="color:#fff;">35 Bauphasen</strong> —
+        von der Grundstückssuche bis zur Schlüsselübergabe.
+        Mit KI-Unterstützung, verifizierten Fachleuten und automatischen Deadlines.
+      </p>
+      <div class="lnd-hero-btns">
+        <a href="{{ url_for('auth.register') }}" class="lnd-btn-primary">
+          Kostenlos starten →
+        </a>
+        <a href="{{ url_for('map.index') }}" class="lnd-btn-ghost">
+          🗺 Fachleute auf der Karte
+        </a>
+      </div>
+      <div class="lnd-hero-trust">
+        <div class="lnd-trust-item"><span>✓</span> Kostenloser Einstieg</div>
+        <div class="lnd-trust-item"><span>✓</span> Kein Kreditkarte nötig</div>
+        <div class="lnd-trust-item"><span>✓</span> Hessen-spezifisch</div>
+      </div>
+    </div>
+
+    <!-- Mockup -->
+    <div class="lnd-hero-mockup">
+      <div class="lnd-mock-bar">
+        <div class="lnd-mock-dot" style="background:#ef4444;"></div>
+        <div class="lnd-mock-dot" style="background:#f59e0b;"></div>
+        <div class="lnd-mock-dot" style="background:#22c55e;"></div>
+        <span style="color:#64748b;font-size:11px;margin-left:8px;font-family:monospace;">Mein Bauprojekt — Phase 3/8</span>
+      </div>
+
+      <div class="lnd-mock-stage done">
+        <div class="lnd-mock-check">✓</div>
+        <div class="lnd-mock-text">Grundstück erworben</div>
+        <div class="lnd-mock-badge done">Erledigt</div>
+      </div>
+      <div class="lnd-mock-stage done">
+        <div class="lnd-mock-check">✓</div>
+        <div class="lnd-mock-text">Bebauungsplan geprüft</div>
+        <div class="lnd-mock-badge done">Erledigt</div>
+      </div>
+      <div class="lnd-mock-stage active">
+        <div class="lnd-mock-check">⟳</div>
+        <div class="lnd-mock-text">Baugenehmigung beantragen</div>
+        <div class="lnd-mock-badge active">Laufend</div>
+      </div>
+      <div class="lnd-mock-stage">
+        <div class="lnd-mock-check" style="color:#475569;">○</div>
+        <div class="lnd-mock-text" style="color:#64748b;">Statiker beauftragen</div>
+        <div class="lnd-mock-badge upcoming">Ausstehend</div>
+      </div>
+      <div class="lnd-mock-stage">
+        <div class="lnd-mock-check" style="color:#475569;">○</div>
+        <div class="lnd-mock-text" style="color:#64748b;">Erschließung koordinieren</div>
+        <div class="lnd-mock-badge upcoming">Ausstehend</div>
+      </div>
+
+      <div class="lnd-mock-ai">
+        <div class="lnd-mock-ai-label">🤖 KI-Assistent</div>
+        <div class="lnd-mock-ai-text">„Für Ihre Baugenehmigung in Hessen benötigen Sie Lageplan (§ 1:500) und Bauzeichnungen nach HBO §65. Die durchschnittliche Bearbeitungszeit beträgt 3 Monate."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── STAT BAR ─────────────────────────────────────────────────────── -->
+<div class="lnd-stats">
+  <div class="lnd-stats-inner">
+    <div class="lnd-stat">
+      <div class="lnd-stat-num">35</div>
+      <div class="lnd-stat-label">strukturierte Bauphasen</div>
+    </div>
+    <div class="lnd-stat">
+      <div class="lnd-stat-num">22+</div>
+      <div class="lnd-stat-label">verifizierte Fachleute</div>
+    </div>
+    <div class="lnd-stat">
+      <div class="lnd-stat-num">100%</div>
+      <div class="lnd-stat-label">Hessen-spezifisch</div>
+    </div>
+    <div class="lnd-stat">
+      <div class="lnd-stat-num">KI</div>
+      <div class="lnd-stat-label">nach Hessischer Bauordnung</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FEATURES ─────────────────────────────────────────────────────── -->
+<section class="lnd-section gray">
+  <div class="lnd-section-inner">
+    <div class="lnd-section-head">
+      <div class="lnd-section-eyebrow">Funktionen</div>
+      <h2 class="lnd-section-title">Alles, was Sie für Ihren Hausbau brauchen</h2>
+      <p class="lnd-section-sub">Eine Plattform für den gesamten Weg — von der ersten Idee bis zur Fertigstellung.</p>
+    </div>
+    <div class="lnd-features">
+      <div class="lnd-feature-card">
+        <div class="lnd-feature-icon blue">🤖</div>
+        <div class="lnd-feature-title">KI-Bauberater nach HBO</div>
+        <div class="lnd-feature-text">
+          Stellen Sie Fragen zu jedem Bauschritt und erhalten Sie präzise Antworten nach der Hessischen Bauordnung — rund um die Uhr, ohne Wartezeit.
+          Der Assistent kennt aktuelle Genehmigungspflichten, Abstände und Bebauungspläne.
+        </div>
+        <div class="lnd-feature-tags">
+          <span class="lnd-tag">HBO-konform</span>
+          <span class="lnd-tag">Dokumente generieren</span>
+          <span class="lnd-tag">Claude AI</span>
+        </div>
+      </div>
+
+      <div class="lnd-feature-card">
+        <div class="lnd-feature-icon purple">📋</div>
+        <div class="lnd-feature-title">35 geführte Bauphasen</div>
+        <div class="lnd-feature-text">
+          Jede Bauphase enthält konkrete Checklisten, Hinweise zu benötigten Dokumenten und typischen Fallstricken.
+          Von der Grundstückssuche über die Baugenehmigung bis zur Abnahme — kein Schritt bleibt unkontrolliert.
+        </div>
+        <div class="lnd-feature-tags">
+          <span class="lnd-tag">Checklisten</span>
+          <span class="lnd-tag">Deadlines</span>
+          <span class="lnd-tag">Fortschritt</span>
+        </div>
+      </div>
+
+      <div class="lnd-feature-card">
+        <div class="lnd-feature-icon teal">👷</div>
+        <div class="lnd-feature-title">Verifizierte Fachleute direkt anfragen</div>
+        <div class="lnd-feature-text">
+          Architekten, Statiker, Notare, Baufirmen und Energieberater — alle auf der Karte, alle geprüft.
+          Bewertungen von echten Bauherren, transparente Konditionen, direkte Kontaktaufnahme über die Plattform.
+        </div>
+        <div class="lnd-feature-tags">
+          <span class="lnd-tag">Hessen-Karte</span>
+          <span class="lnd-tag">Bewertungen</span>
+          <span class="lnd-tag">PLZ-Filter</span>
+        </div>
+      </div>
+
+      <div class="lnd-feature-card">
+        <div class="lnd-feature-icon amber">💰</div>
+        <div class="lnd-feature-title">Finanzierungsplan & KfW-Integration</div>
+        <div class="lnd-feature-text">
+          Erstellen Sie Ihren Tilgungsplan, vergleichen Sie KfW-Programme (124, 261, 300) und behalten Sie Eigenkapital,
+          Bankkredit und Fördermittel in einer übersichtlichen Ansicht im Blick.
+        </div>
+        <div class="lnd-feature-tags">
+          <span class="lnd-tag">Tilgungsplan</span>
+          <span class="lnd-tag">KfW 124 / 261</span>
+          <span class="lnd-tag">Zinsrechner</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── HOW IT WORKS ─────────────────────────────────────────────────── -->
+<section class="lnd-section">
+  <div class="lnd-section-inner">
+    <div class="lnd-section-head" style="text-align:center;max-width:600px;margin:0 auto 52px;">
+      <div class="lnd-section-eyebrow">So funktioniert es</div>
+      <h2 class="lnd-section-title">In 3 Schritten zum strukturierten Bauprojekt</h2>
+    </div>
+    <div class="lnd-steps">
+      <div class="lnd-step">
+        <div class="lnd-step-num">1</div>
+        <div class="lnd-step-title">Projekt anlegen (5 Min.)</div>
+        <div class="lnd-step-text">
+          Geben Sie Grundstück, Gemeinde und Bautyp ein. BauNavigator erkennt automatisch
+          den zuständigen Bebauungsplan und passende Genehmigungspflichten für Hessen.
+        </div>
+      </div>
+      <div class="lnd-step">
+        <div class="lnd-step-num">2</div>
+        <div class="lnd-step-title">KI begleitet jeden Schritt</div>
+        <div class="lnd-step-text">
+          Für jede Phase stehen Checklisten, KI-Antworten und automatisch generierte
+          Dokumente bereit — Anfragen, Anschreiben, Nachweise, alles nach HBO-Standard.
+        </div>
+      </div>
+      <div class="lnd-step">
+        <div class="lnd-step-num">3</div>
+        <div class="lnd-step-title">Fachleute gezielt einbinden</div>
+        <div class="lnd-step-text">
+          Sobald Sie einen Spezialisten brauchen, finden Sie ihn direkt auf der Karte —
+          nach PLZ, Gewerk und Verfügbarkeit. Anfrage mit einem Klick.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── WHY US ───────────────────────────────────────────────────────── -->
+<section class="lnd-section gray">
+  <div class="lnd-section-inner">
+    <div class="lnd-section-head">
+      <div class="lnd-section-eyebrow">Warum BauNavigator</div>
+      <h2 class="lnd-section-title">Der Unterschied, der zählt</h2>
+      <p class="lnd-section-sub">Bauen ohne digitale Unterstützung kostet Zeit, Nerven und Geld. BauNavigator macht Schluss damit.</p>
+    </div>
+    <div class="lnd-compare">
+      <div class="lnd-compare-col them">
+        <div class="lnd-compare-label">Ohne BauNavigator</div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✗</span>
+          <span class="lnd-ci-text">Wichtige Fristen werden übersehen — Bußgelder, Verzögerungen</span>
+        </div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✗</span>
+          <span class="lnd-ci-text">Stundenlange Recherche zu HBO, Genehmigungen und Formularen</span>
+        </div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✗</span>
+          <span class="lnd-ci-text">Fachleute über Empfehlungen oder Glück finden — keine Transparenz</span>
+        </div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✗</span>
+          <span class="lnd-ci-text">Excel-Tabellen für Finanzierung — unübersichtlich, fehleranfällig</span>
+        </div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✗</span>
+          <span class="lnd-ci-text">Kein Überblick: Welche Phase bin ich? Was kommt als Nächstes?</span>
+        </div>
+      </div>
+      <div class="lnd-compare-col us">
+        <div class="lnd-compare-label">Mit BauNavigator</div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✓</span>
+          <span class="lnd-ci-text">Automatische Deadline-Erinnerungen für jeden Bauabschnitt</span>
+        </div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✓</span>
+          <span class="lnd-ci-text">KI beantwortet HBO-Fragen sofort — präzise, auf Ihre Gemeinde zugeschnitten</span>
+        </div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✓</span>
+          <span class="lnd-ci-text">Verifizierte Fachleute mit Bewertungen auf interaktiver Karte</span>
+        </div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✓</span>
+          <span class="lnd-ci-text">Interaktiver Finanzierungsplan mit KfW-Programmen auf einen Blick</span>
+        </div>
+        <div class="lnd-compare-item">
+          <span class="lnd-ci-icon">✓</span>
+          <span class="lnd-ci-text">Dashboard mit Fortschritt, offenen Aufgaben und nächstem Schritt</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PRICING ──────────────────────────────────────────────────────── -->
+<section class="lnd-section" id="preise">
+  <div class="lnd-section-inner">
+    <div class="lnd-section-head" style="text-align:center;max-width:560px;margin:0 auto 52px;">
+      <div class="lnd-section-eyebrow">Preise</div>
+      <h2 class="lnd-section-title">Transparent. Ohne Überraschungen.</h2>
+      <p class="lnd-section-sub" style="margin:0 auto;">Starten Sie kostenlos — upgraden Sie, wenn Sie mehr KI-Power brauchen.</p>
+    </div>
+    <div class="lnd-pricing">
+      <!-- FREE -->
+      <div class="lnd-plan">
+        <div class="lnd-plan-name">Free</div>
+        <div class="lnd-plan-price">0 €<small>/Monat</small></div>
+        <div class="lnd-plan-desc">Einstieg ohne Risiko</div>
+        <ul class="lnd-plan-features">
+          <li>Bis zu 3 Bauprojekte</li>
+          <li>35 Bauphasen mit Checklisten</li>
+          <li>Fachleute-Karte (Ansicht)</li>
+          <li>Basis-KI-Fragen (5/Tag)</li>
+          <li>Finanzierungsübersicht</li>
+        </ul>
+        <a href="{{ url_for('auth.register') }}" class="lnd-plan-cta outline">Kostenlos starten</a>
+      </div>
+
+      <!-- PRO -->
+      <div class="lnd-plan popular">
+        <div class="lnd-plan-badge">Empfohlen</div>
+        <div class="lnd-plan-name">Pro</div>
+        <div class="lnd-plan-price">19 €<small>/Monat</small></div>
+        <div class="lnd-plan-desc">Für ernsthafte Bauherren</div>
+        <ul class="lnd-plan-features">
+          <li>Unbegrenzte Projekte</li>
+          <li>Alles aus Free</li>
+          <li>KI-Dokumente generieren</li>
+          <li>Vollständiger Finanzierungsplan</li>
+          <li>Fachleute direkt anfragen</li>
+          <li>Prioritäts-Antworten</li>
+        </ul>
+        <a href="{{ url_for('auth.register') }}" class="lnd-plan-cta solid">Jetzt Pro werden</a>
+      </div>
+
+      <!-- EXPERT -->
+      <div class="lnd-plan">
+        <div class="lnd-plan-name">Expert</div>
+        <div class="lnd-plan-price">49 €<small>/Monat</small></div>
+        <div class="lnd-plan-desc">Maximale Unterstützung</div>
+        <ul class="lnd-plan-features">
+          <li>Alles aus Pro</li>
+          <li>KfW-Analyse & Vergleich</li>
+          <li>Erweiterte KI-Kontexte</li>
+          <li>Unbegrenzte Dokument-Generierung</li>
+          <li>Priority-Support</li>
+          <li>Früher Zugang zu neuen Features</li>
+        </ul>
+        <a href="{{ url_for('auth.register') }}" class="lnd-plan-cta outline">Expert werden</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PROVIDER BANNER ─────────────────────────────────────────────── -->
+<section class="lnd-section" style="padding-top:0;padding-bottom:88px;">
+  <div class="lnd-section-inner">
+    <div class="lnd-provider-banner">
+      <div>
+        <h2>Sie sind Fachmann im Bauwesen?</h2>
+        <p>
+          Registrieren Sie sich als verifizierter Anbieter auf BauNavigator — und werden Sie von Bauherren genau dann gefunden,
+          wenn sie Sie brauchen. Mit eigenem Profil, Bewertungen, KI-Chatbot und flexiblen Terminslots.
+        </p>
+        <div class="lnd-provider-tags">
+          <span class="lnd-ptag">🏛 Architekt</span>
+          <span class="lnd-ptag">⚙️ Statiker</span>
+          <span class="lnd-ptag">🔨 Bauunternehmer</span>
+          <span class="lnd-ptag">⚖️ Notar</span>
+          <span class="lnd-ptag">🌿 Energieberater</span>
+          <span class="lnd-ptag">🏦 Finanzberater</span>
+          <span class="lnd-ptag">📐 Vermesser</span>
+        </div>
+      </div>
+      <div style="flex-shrink:0;">
+        <a href="{{ url_for('provider_admin.register') }}" class="lnd-btn-primary" style="white-space:nowrap;font-size:14px;">
+          Anbieter werden →
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FINAL CTA ────────────────────────────────────────────────────── -->
+<section class="lnd-final">
+  <h2>Bereit, Ihr Bauvorhaben zu starten?</h2>
+  <p>Kostenlos registrieren — in 2 Minuten einsatzbereit.</p>
+  <div class="lnd-final-btns">
+    <a href="{{ url_for('auth.register') }}" class="lnd-btn-white">Jetzt kostenlos starten →</a>
+    <a href="{{ url_for('map.index') }}" class="lnd-btn-outline-white">🗺 Fachleute ansehen</a>
+  </div>
+</section>
+
+<!-- ── FOOTER ───────────────────────────────────────────────────────── -->
+<footer class="lnd-footer">
+  <div class="lnd-footer-inner">
+    <div>
+      <a href="{{ url_for('dashboard.index') }}" class="lnd-footer-brand">
+        <span>⌂</span>
+        <strong>BauNavigator</strong>
+      </a>
+      <div class="lnd-footer-sub">Ihr digitaler Baubegleiter für Hessen · © 2026</div>
+    </div>
+    <div class="lnd-footer-links">
+      <a href="{{ url_for('map.index') }}">Fachleute-Karte</a>
+      <a href="{{ url_for('providers.index') }}">Alle Anbieter</a>
+      <a href="{{ url_for('auth.register') }}">Registrieren</a>
+      <a href="{{ url_for('auth.login') }}">Anmelden</a>
+      <a href="{{ url_for('provider_admin.register') }}">Anbieter-Portal</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
