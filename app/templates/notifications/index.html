@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Benachrichtigungen — BauNavigator{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:720px;margin:0 auto;padding:28px 16px;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <h1 style="margin:0;font-size:22px;">🔔 Benachrichtigungen</h1>
+    {% if notifications %}
+    <form action="{{ url_for('notifications.mark_all_read') }}" method="POST" style="display:inline;">
+      <button type="submit" style="
+        background:none;border:1px solid #e2e8f0;border-radius:6px;
+        padding:6px 14px;font-size:12px;cursor:pointer;color:#3b82f6;
+      ">✓ Alle als gelesen markieren</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if not notifications %}
+  <div style="text-align:center;padding:60px 20px;color:#94a3b8;">
+    <div style="font-size:48px;margin-bottom:12px;">🔔</div>
+    <div style="font-size:16px;font-weight:600;color:#374151;">Keine Benachrichtigungen</div>
+    <div style="font-size:14px;margin-top:6px;">Sie sind auf dem aktuellen Stand.</div>
+  </div>
+  {% else %}
+
+  {% set type_colors = {
+    'stage_change': '#dbeafe',
+    'law_update': '#ede9fe',
+    'finance_alert': '#fef3c7',
+    'document_missing': '#fee2e2',
+    'camera_report': '#d1fae5',
+    'deadline': '#fee2e2',
+    'system': '#f1f5f9'
+  } %}
+
+  {% for n in notifications %}
+  <div style="
+    background:{% if not n.is_read %}#eff6ff{% else %}#fff{% endif %};
+    border:1px solid {% if not n.is_read %}#bfdbfe{% else %}#e2e8f0{% endif %};
+    border-left:4px solid {{ type_colors.get(n.type.value, '#e2e8f0') }};
+    border-radius:8px;padding:14px 16px;margin-bottom:10px;
+    display:flex;gap:14px;align-items:flex-start;
+  ">
+    <span style="font-size:22px;line-height:1.2;flex-shrink:0;">{{ icons.get(n.type.value, 'ℹ️') }}</span>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="font-weight:{% if not n.is_read %}700{% else %}500{% endif %};
+          font-size:14px;color:#0f172a;">{{ n.title }}</div>
+        <div style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">
+          {{ n.created_at.strftime('%d.%m.%Y %H:%M') }}
+        </div>
+      </div>
+      {% if n.message %}
+      <div style="font-size:13px;color:#475569;margin-top:4px;">{{ n.message }}</div>
+      {% endif %}
+      {% if n.link %}
+      <a href="{{ n.link }}" style="font-size:12px;color:#3b82f6;text-decoration:none;margin-top:6px;display:inline-block;">
+        Details anzeigen →
+      </a>
+      {% endif %}
+    </div>
+    {% if not n.is_read %}
+    <span style="width:8px;height:8px;background:#3b82f6;border-radius:50%;flex-shrink:0;margin-top:6px;"></span>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% endif %}
+</div>
+{% endblock %}

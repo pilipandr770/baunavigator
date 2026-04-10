@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+{% block title %}Kameras — {{ project.title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;margin:0 auto;padding:28px 16px;">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+    <div>
+      <a href="{{ url_for('project.detail', project_id=project.id) }}"
+         style="font-size:12px;color:#64748b;text-decoration:none;">← {{ project.title }}</a>
+      <h1 style="margin:4px 0 0;font-size:22px;">📷 Baustellenkameras</h1>
+    </div>
+    <button onclick="toggleForm()" class="btn btn-primary btn-sm">+ Kamera hinzufügen</button>
+  </div>
+
+  <!-- Telegram info banner -->
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;">
+    <strong>📱 Telegram-Bot für Innenarbeiten:</strong>
+    Öffnen Sie Telegram, starten Sie <code>@BauNavigatorBot</code> und senden Sie
+    <code>/start {{ project.id }}</code>. Danach können Fotos direkt analysiert werden.
+    <br>
+    <strong>🔌 IP-Kamera (RTSP):</strong>
+    Kameras am Bauzaun — RTSP-Stream wird stündlich ausgelesen und analysiert.
+    Typisches Format: <code>rtsp://admin:passwort@192.168.1.100:554/stream</code>
+  </div>
+
+  <!-- Add camera form -->
+  <div id="addForm" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:24px;">
+    <h3 style="margin:0 0 16px;font-size:15px;">Neue Kamera hinzufügen</h3>
+    <form method="POST" action="{{ url_for('project.camera_add', project_id=project.id) }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Typ</label>
+          <select name="feed_type" class="form-control" id="feedTypeSelect" onchange="updateForm()">
+            <option value="rtsp">🔌 IP-Kamera / RTSP (Bauzaun)</option>
+            <option value="telegram">📱 Telegram-Bot (Innenarbeiten)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Name *</label>
+          <input type="text" name="name" class="form-control" placeholder="z.B. Dachkamera Nord" required>
+        </div>
+        <div id="rtspField" style="grid-column:1/-1;">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">RTSP-URL</label>
+          <input type="text" name="rtsp_url" class="form-control"
+                 placeholder="rtsp://admin:password@192.168.1.100:554/stream1">
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">
+            Tipp: Viele ONVIF-Kameras nutzen Port 554. ONVIF Device Manager hilft beim Finden der URL.
+          </div>
+        </div>
+        <div id="telegramInfo" style="display:none;grid-column:1/-1;background:#dbeafe;border-radius:6px;padding:10px;font-size:12px;color:#1d4ed8;">
+          📱 Nach dem Speichern wird die Kamera-ID angezeigt. Senden Sie in Telegram: <code>/start {{ project.id }}</code>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Prüfintervall (Minuten)</label>
+          <input type="number" name="interval" class="form-control" value="60" min="15" max="1440">
+        </div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;">
+        <button type="submit" class="btn btn-primary btn-sm">Speichern</button>
+        <button type="button" onclick="toggleForm()" class="btn btn-sm" style="background:#f1f5f9;border:1px solid #e2e8f0;">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Camera list -->
+  {% if feeds %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:32px;">
+    {% for cam in feeds %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+      <!-- Camera header -->
+      <div style="
+        padding:14px 16px;display:flex;justify-content:space-between;align-items:center;
+        background:{% if cam.feed_type.value == 'rtsp' %}#0f172a{% else %}#0088cc{% endif %};
+        color:#fff;
+      ">
+        <div>
+          <div style="font-weight:700;font-size:14px;">
+            {% if cam.feed_type.value == 'rtsp' %}🔌{% else %}📱{% endif %}
+            {{ cam.name }}
+          </div>
+          <div style="font-size:11px;opacity:0.7;margin-top:2px;">
+            {{ 'IP-Kamera / RTSP' if cam.feed_type.value == 'rtsp' else 'Telegram-Bot' }}
+            · {{ cam.check_interval_minutes }}min Intervall
+          </div>
+        </div>
+        <span style="
+          padding:3px 8px;border-radius:12px;font-size:10px;font-weight:600;
+          background:{% if cam.is_active %}rgba(16,185,129,.25){% else %}rgba(239,68,68,.25){% endif %};
+        ">{{ 'aktiv' if cam.is_active else 'inaktiv' }}</span>
+      </div>
+
+      <!-- Last snapshot preview -->
+      {% set last_snap = cam.snapshots.first() %}
+      {% if last_snap %}
+      <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">
+        {% if last_snap.image_path %}
+        <img src="{{ url_for('static', filename=last_snap.image_path) }}"
+             style="width:100%;height:160px;object-fit:cover;border-radius:6px;margin-bottom:10px;"
+             alt="Letzter Snapshot" loading="lazy">
+        {% endif %}
+        {% if last_snap.ai_progress_pct is not none %}
+        <div style="margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+            <span>Fortschritt</span>
+            <strong>{{ last_snap.ai_progress_pct }}%</strong>
+          </div>
+          <div style="height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:{{ last_snap.ai_progress_pct }}%;background:
+              {% if last_snap.ai_progress_pct >= 80 %}#10b981{% elif last_snap.ai_progress_pct >= 40 %}#f59e0b{% else %}#3b82f6{% endif %};
+              border-radius:3px;"></div>
+          </div>
+        </div>
+        {% endif %}
+        {% if last_snap.ai_summary %}
+        <div style="font-size:12px;color:#374151;">{{ last_snap.ai_summary[:150] }}</div>
+        {% endif %}
+        {% if last_snap.ai_issues %}
+        <div style="margin-top:6px;font-size:11px;color:#ef4444;">
+          ⚠️ {{ last_snap.ai_issues.split('\n')[0][:80] }}
+        </div>
+        {% endif %}
+        <div style="font-size:10px;color:#94a3b8;margin-top:6px;">
+          {{ last_snap.captured_at.strftime('%d.%m.%Y %H:%M') }}
+          · {{ STAGE_LABELS.get(last_snap.stage_key, '–') if last_snap.stage_key }}
+        </div>
+      </div>
+      {% else %}
+      <div style="padding:20px 16px;text-align:center;color:#94a3b8;font-size:13px;">
+        Noch keine Snapshots
+      </div>
+      {% endif %}
+
+      <!-- Actions -->
+      <div style="padding:10px 16px;display:flex;gap:8px;background:#fafafa;">
+        {% if cam.feed_type.value == 'rtsp' and cam.rtsp_url %}
+        <form method="POST" action="{{ url_for('project.camera_snapshot_now', project_id=project.id, camera_id=cam.id) }}" style="flex:1;">
+          <button type="submit" style="width:100%;padding:6px;font-size:12px;background:#dbeafe;color:#1d4ed8;border:none;border-radius:5px;cursor:pointer;font-weight:600;">
+            📸 Jetzt Snapshot
+          </button>
+        </form>
+        {% elif cam.feed_type.value == 'telegram' %}
+        <div style="flex:1;text-align:center;font-size:11px;color:#0088cc;padding:6px;">
+          Warte auf Foto von Telegram…
+        </div>
+        {% endif %}
+        <form method="POST" action="{{ url_for('project.camera_delete', project_id=project.id, camera_id=cam.id) }}"
+              onsubmit="return confirm('Kamera löschen?')" style="display:inline;">
+          <button type="submit" style="padding:6px 10px;font-size:11px;background:#fee2e2;color:#991b1b;border:none;border-radius:5px;cursor:pointer;">
+            🗑
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:48px 20px;color:#94a3b8;">
+    <div style="font-size:48px;margin-bottom:12px;">📷</div>
+    <div style="font-size:16px;font-weight:600;color:#374151;">Keine Kameras konfiguriert</div>
+    <div style="font-size:13px;margin-top:6px;">Klicken Sie auf "Kamera hinzufügen" um zu starten.</div>
+  </div>
+  {% endif %}
+
+  <!-- Snapshot gallery -->
+  {% if recent_snaps %}
+  <h2 style="font-size:17px;margin-bottom:16px;">🖼 Letzte Snapshots</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+    {% for snap in recent_snaps %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;"
+         onclick="openSnap(this)" style="cursor:pointer;">
+      {% if snap.image_path %}
+      <img src="{{ url_for('static', filename=snap.image_path) }}"
+           style="width:100%;height:160px;object-fit:cover;" alt="" loading="lazy">
+      {% else %}
+      <div style="height:160px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:32px;">📷</div>
+      {% endif %}
+      <div style="padding:10px 12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:11px;font-weight:600;color:#64748b;">
+            {{ snap.camera.name if snap.camera else '–' }}
+          </span>
+          {% if snap.ai_progress_pct is not none %}
+          <span style="font-size:11px;font-weight:700;color:
+            {% if snap.ai_progress_pct >= 80 %}#10b981{% elif snap.ai_progress_pct >= 40 %}#f59e0b{% else %}#3b82f6{% endif %};">
+            {{ snap.ai_progress_pct }}%
+          </span>
+          {% endif %}
+        </div>
+        {% if snap.ai_summary %}
+        <div style="font-size:11px;color:#374151;line-height:1.4;">{{ snap.ai_summary[:100] }}{% if snap.ai_summary|length > 100 %}…{% endif %}</div>
+        {% endif %}
+        {% if snap.ai_issues %}
+        <div style="font-size:10px;color:#ef4444;margin-top:4px;">⚠️ {{ snap.ai_issues.split('\n')[0][:60] }}</div>
+        {% endif %}
+        <div style="font-size:10px;color:#94a3b8;margin-top:6px;">
+          {{ snap.captured_at.strftime('%d.%m.%Y %H:%M') }}
+          · {{ 'RTSP' if snap.source_type == 'rtsp' else 'Telegram' }}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+{% block scripts %}
+<script>
+function toggleForm() {
+  const f = document.getElementById('addForm');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function updateForm() {
+  const type = document.getElementById('feedTypeSelect').value;
+  document.getElementById('rtspField').style.display   = type === 'rtsp' ? 'block' : 'none';
+  document.getElementById('telegramInfo').style.display = type === 'telegram' ? 'block' : 'none';
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -40,8 +40,24 @@ def init_scheduler(app):
         replace_existing=True,
         misfire_grace_time=7200,
     )
+    # Email digest — every day at 07:30
+    _scheduler.add_job(
+        func=lambda: _send_notification_digest(app),
+        trigger=CronTrigger(hour=7, minute=30),
+        id="notification_digest",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+    # Camera snapshots — every hour
+    _scheduler.add_job(
+        func=lambda: _run_camera_snapshots(app),
+        trigger=CronTrigger(minute=0),   # top of every hour
+        id="camera_snapshots",
+        replace_existing=True,
+        misfire_grace_time=1800,
+    )
     _scheduler.start()
-    logger.info("APScheduler started — deadline_reminders + law_updates jobs registered.")
+    logger.info("APScheduler started — 4 jobs: deadline_reminders, law_updates, notification_digest, camera_snapshots")
 
 
 def _send_deadline_reminders(app):
@@ -133,6 +149,26 @@ def _send_deadline_reminders(app):
 
         except Exception as exc:
             logger.error("Deadline reminder job error: %s", exc)
+
+
+def _send_notification_digest(app):
+    """Daily email digest for unread notifications."""
+    with app.app_context():
+        try:
+            from app.services.notification_service import send_daily_digest
+            send_daily_digest(app)
+        except Exception as exc:
+            logger.error("Notification digest job error: %s", exc)
+
+
+def _run_camera_snapshots(app):
+    """Hourly RTSP frame grab + AI analysis for active cameras."""
+    with app.app_context():
+        try:
+            from app.services.camera_service import check_all_rtsp_cameras
+            check_all_rtsp_cameras(app)
+        except Exception as exc:
+            logger.error("Camera snapshot job error: %s", exc)
 
 
 def _run_law_agent(app):

@@ -35,8 +35,71 @@ from flask import current_app
 
 logger = logging.getLogger(__name__)
 
+# ── Jina Reader endpoint ─────────────────────────────────────────────────────
+# Возвращает чистый Markdown без JS/nav/styles.
+# Опционально используем JINA_API_KEY для повышенных лимитов (5 req/s без ключа).
+_JINA_BASE = 'https://r.jina.ai/'
 
-# ── Список источников по умолчанию (seed при первом запуске) ────────────────
+_HEADERS_JINA = {
+    'Accept': 'text/plain',
+    'X-Return-Format': 'text',
+    'User-Agent': (
+        'Mozilla/5.0 (compatible; BauNavigator-LawAgent/1.0; '
+        '+https://baunavigator.de/bot)'
+    ),
+}
+
+_WHITESPACE_RE = re.compile(r'\n{3,}')
+
+
+def _fetch_text(url: str, timeout: int = 20) -> Optional[str]:
+    """
+    Загружает страницу через Jina AI Reader (r.jina.ai) и возвращает
+    чистый текст/Markdown без навигации, скриптов и рекламы.
+    Fallback: прямой urllib-запрос если Jina недоступен.
+    """
+    jina_url = _JINA_BASE + url
+    headers = dict(_HEADERS_JINA)
+
+    # Добавляем API-ключ если задан
+    try:
+        jina_key = current_app.config.get('JINA_API_KEY') or ''
+    except RuntimeError:
+        jina_key = ''
+    if jina_key:
+        headers['Authorization'] = f'Bearer {jina_key}'
+
+    try:
+        req = urllib.request.Request(jina_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read().decode('utf-8', errors='replace')
+        # Нормализуем лишние пустые строки
+        text = _WHITESPACE_RE.sub('\n\n', text).strip()
+        return text[:80_000]
+    except Exception as exc:
+        logger.warning(f'Jina Reader failed [{url}]: {exc} — trying direct fetch')
+
+    # ── Fallback: прямой urllib ──────────────────────────────────────────────
+    _STRIP_TAGS_RE = re.compile(
+        r'<(script|style|nav|header|footer|aside|iframe)[^>]*>.*?</\1>',
+        re.DOTALL | re.IGNORECASE,
+    )
+    _TAG_RE = re.compile(r'<[^>]+>')
+    _WS_RE  = re.compile(r'\s+')
+    try:
+        req2 = urllib.request.Request(url, headers={
+            'User-Agent': 'Mozilla/5.0 (compatible; BauNavigator/1.0)',
+            'Accept-Language': 'de-DE,de;q=0.9',
+        })
+        with urllib.request.urlopen(req2, timeout=timeout) as resp:
+            raw = resp.read().decode('utf-8', errors='replace')
+        text = _STRIP_TAGS_RE.sub('', raw)
+        text = _TAG_RE.sub(' ', text)
+        text = _WS_RE.sub(' ', text).strip()
+        return text[:80_000]
+    except Exception as exc2:
+        logger.warning(f'LawAgent direct fetch error [{url}]: {exc2}')
+        return None
 
 DEFAULT_SOURCES = [
     # ── Bundesrecht ──────────────────────────────────────────────────────────
@@ -116,55 +179,7 @@ DEFAULT_SOURCES = [
 ]
 
 
-# ── Fetch-Hilfsfunktionen ─────────────────────────────────────────────────────
-
-_HEADERS = {
-    'User-Agent': (
-        'Mozilla/5.0 (compatible; BauNavigator-LawAgent/1.0; '
-        '+https://baunavigator.de/bot)'
-    ),
-    'Accept-Language': 'de-DE,de;q=0.9',
-    'Accept': 'text/html,application/xhtml+xml',
-}
-
-# Теги, чьё содержимое мы НЕ хотим включать в хэш
-_STRIP_TAGS_RE = re.compile(
-    r'<(script|style|nav|header|footer|aside|iframe)[^>]*>.*?</\1>',
-    re.DOTALL | re.IGNORECASE,
-)
-_TAG_RE = re.compile(r'<[^>]+>')
-_WHITESPACE_RE = re.compile(r'\s+')
-
-
-def _fetch_text(url: str, timeout: int = 15) -> Optional[str]:
-    """
-    Загружает HTML-страницу и возвращает нормализованный текст основного
-    контента (без скриптов, стилей и навигационных элементов).
-
-    Возвращает None при ошибке.
-    """
-    try:
-        req = urllib.request.Request(url, headers=_HEADERS)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read()
-            charset = 'utf-8'
-            content_type = resp.headers.get_content_type() or ''
-            if 'charset=' in content_type:
-                charset = content_type.split('charset=')[-1].strip()
-            html = raw.decode(charset, errors='replace')
-    except Exception as exc:
-        logger.warning(f'LawAgent fetch error [{url}]: {exc}')
-        return None
-
-    # Убираем скрипты, стили и навигацию
-    text = _STRIP_TAGS_RE.sub('', html)
-    # Убираем все HTML-теги
-    text = _TAG_RE.sub(' ', text)
-    # Нормализуем пробелы
-    text = _WHITESPACE_RE.sub(' ', text).strip()
-    # Ограничиваем до первых 80 000 символов (основное содержимое)
-    return text[:80_000]
-
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode('utf-8', errors='replace')).hexdigest()

@@ -8,7 +8,8 @@ from app.models.enums import (
     StageKey, StageStatus, ActionMode, ActionType,
     OutboxStatus, RecipientType, DocType, ZoneType,
     ProviderCategory, LicenseType, VerifiedStatus,
-    ProviderPlan, LeadStatus, FinancingStatus
+    ProviderPlan, LeadStatus, FinancingStatus,
+    NotificationType, CameraFeedType
 )
 
 
@@ -559,6 +560,81 @@ class LawSource(db.Model):
 
     logs = db.relationship('LawUpdateLog', back_populates='source',
                            order_by='LawUpdateLog.checked_at.desc()', lazy='dynamic')
+
+
+# ─────────────────────────────────────────────────────
+# NOTIFICATIONS DOMAIN
+# ─────────────────────────────────────────────────────
+
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+
+    id         = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    user_id    = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
+    project_id = db.Column(db.String(36), db.ForeignKey('projects.id'), nullable=True)
+    type       = db.Column(db.Enum(NotificationType), nullable=False)
+    title      = db.Column(db.String(255), nullable=False)
+    message    = db.Column(db.Text)
+    link       = db.Column(db.String(512))   # url_for target
+    is_read    = db.Column(db.Boolean, default=False, nullable=False)
+    email_sent = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=now_utc, nullable=False,
+                           index=True)
+
+    user    = db.relationship('User', backref=db.backref('notifications', lazy='dynamic'))
+    project = db.relationship('Project', backref=db.backref('notifications', lazy='dynamic'))
+
+
+# ─────────────────────────────────────────────────────
+# CAMERA DOMAIN
+# ─────────────────────────────────────────────────────
+
+class CameraFeed(db.Model):
+    __tablename__ = 'camera_feeds'
+
+    id                    = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    project_id            = db.Column(db.String(36), db.ForeignKey('projects.id'),
+                                      nullable=False, index=True)
+    name                  = db.Column(db.String(255), nullable=False)  # z.B. "Dachkamera Nord"
+    feed_type             = db.Column(db.Enum(CameraFeedType), nullable=False,
+                                      default=CameraFeedType.RTSP)
+    rtsp_url              = db.Column(db.String(512))    # rtsp://user:pass@ip:554/stream
+    telegram_chat_id      = db.Column(db.String(100))   # Telegram chat_id linked to this camera
+    is_active             = db.Column(db.Boolean, default=True, nullable=False)
+    check_interval_minutes= db.Column(db.SmallInteger, default=60)
+    last_snapshot_at      = db.Column(db.DateTime(timezone=True))
+    created_at            = db.Column(db.DateTime(timezone=True), default=now_utc,
+                                      nullable=False)
+
+    project   = db.relationship('Project',
+                                backref=db.backref('cameras', lazy='dynamic'))
+    snapshots = db.relationship('CameraSnapshot', back_populates='camera',
+                                order_by='CameraSnapshot.captured_at.desc()',
+                                lazy='dynamic')
+
+
+class CameraSnapshot(db.Model):
+    __tablename__ = 'camera_snapshots'
+
+    id                 = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    camera_id          = db.Column(db.String(36), db.ForeignKey('camera_feeds.id'),
+                                   nullable=False, index=True)
+    project_id         = db.Column(db.String(36), db.ForeignKey('projects.id'),
+                                   nullable=False, index=True)
+    captured_at        = db.Column(db.DateTime(timezone=True), default=now_utc,
+                                   nullable=False, index=True)
+    image_path         = db.Column(db.String(512))   # static/snapshots/<id>.jpg
+    telegram_file_id   = db.Column(db.String(255))   # Telegram file_id для повторного скачивания
+    stage_key          = db.Column(db.Enum(StageKey))
+    ai_summary         = db.Column(db.Text)          # краткий итог от Claude Vision
+    ai_progress_pct    = db.Column(db.SmallInteger)  # 0-100 % этапа по оценке AI
+    ai_issues          = db.Column(db.Text)          # замеченные проблемы
+    ai_raw_json        = db.Column(db.Text)          # полный JSON-ответ AI
+    source_type        = db.Column(db.String(20), default='rtsp')  # rtsp | telegram
+
+    camera  = db.relationship('CameraFeed', back_populates='snapshots')
+    project = db.relationship('Project',
+                              backref=db.backref('snapshots', lazy='dynamic'))
 
 
 class LawUpdateLog(db.Model):

@@ -1,6 +1,21 @@
 import enum
 
 
+class NotificationType(str, enum.Enum):
+    STAGE_CHANGE      = 'stage_change'       # Этап изменён
+    LAW_UPDATE        = 'law_update'         # Изменение закона
+    FINANCE_ALERT     = 'finance_alert'      # Финансовый алерт
+    DOCUMENT_MISSING  = 'document_missing'   # Недостающий документ
+    CAMERA_REPORT     = 'camera_report'      # Отчёт с камеры
+    DEADLINE          = 'deadline'           # Дедлайн
+    SYSTEM            = 'system'             # Системное
+
+
+class CameraFeedType(str, enum.Enum):
+    RTSP     = 'rtsp'     # IP-камера / ONVIF
+    TELEGRAM = 'telegram' # Telegram-бот (внутренние работы)
+
+
 class SubscriptionPlan(str, enum.Enum):
     FREE = 'free'
     PRO = 'pro'

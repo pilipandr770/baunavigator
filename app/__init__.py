@@ -51,6 +51,9 @@ def create_app():
     app.config['ANTHROPIC_API_KEY'] = os.getenv('ANTHROPIC_API_KEY')
     app.config['STRIPE_SECRET_KEY'] = os.getenv('STRIPE_SECRET_KEY')
     app.config['STRIPE_WEBHOOK_SECRET'] = os.getenv('STRIPE_WEBHOOK_SECRET')
+    app.config['TELEGRAM_BOT_TOKEN'] = os.getenv('TELEGRAM_BOT_TOKEN', '')
+    app.config['JINA_API_KEY'] = os.getenv('JINA_API_KEY', '')
+    app.config['BASE_URL'] = os.getenv('BASE_URL', 'https://baunavigator.de')
 
     # ── Extensions ────────────────────────────────────
     db.init_app(app)
@@ -87,6 +90,8 @@ def create_app():
     from app.routes.provider_admin import provider_admin_bp
     from app.routes.admin import admin_bp
     from app.routes.legal import legal_bp
+    from app.routes.notifications import notifications_bp
+    from app.routes.telegram_bot import telegram_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/')
@@ -99,6 +104,8 @@ def create_app():
     app.register_blueprint(provider_admin_bp, url_prefix='/provider-admin')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(legal_bp, url_prefix='/legal')
+    app.register_blueprint(notifications_bp, url_prefix='/notifications')
+    app.register_blueprint(telegram_bp, url_prefix='/telegram')
 
     # ── Shell context ─────────────────────────────────
     @app.shell_context_processor
@@ -128,11 +135,19 @@ def create_app():
                 .count()
             )
 
+        unread_notifications = 0
+        if current_user.is_authenticated:
+            from app.models.models import Notification
+            unread_notifications = Notification.query.filter_by(
+                user_id=current_user.id, is_read=False
+            ).count()
+
         return {
             'app_name': app.config['APP_NAME'],
             'StageKey': StageKey,
             'ActionMode': ActionMode,
             'nav_pending_outbox': pending_count,
+            'nav_unread_notifications': unread_notifications,
         }
 
     from app.models.enums import StageKey, ActionMode

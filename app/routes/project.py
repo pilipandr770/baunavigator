@@ -889,3 +889,117 @@ def mailbox_send(project_id):
     return jsonify(result)
 
 
+# ─────────────────────────────────────────────────────
+# CAMERA ROUTES
+# ─────────────────────────────────────────────────────
+
+@project_bp.route('/<project_id>/cameras')
+@login_required
+def cameras(project_id):
+    """Camera management + snapshot gallery for a project."""
+    from app.models.models import CameraFeed, CameraSnapshot
+    from app.models.enums import CameraFeedType, STAGE_LABELS
+
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    feeds = CameraFeed.query.filter_by(project_id=project_id).order_by(
+        CameraFeed.created_at.desc()
+    ).all()
+
+    # Last 20 snapshots across all cameras
+    recent_snaps = (
+        CameraSnapshot.query.filter_by(project_id=project_id)
+        .order_by(CameraSnapshot.captured_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    return render_template(
+        'project/cameras.html',
+        project=project,
+        feeds=feeds,
+        recent_snaps=recent_snaps,
+        CameraFeedType=CameraFeedType,
+        STAGE_LABELS=STAGE_LABELS,
+        stage_labels=STAGE_LABELS,
+    )
+
+
+@project_bp.route('/<project_id>/cameras/add', methods=['POST'])
+@login_required
+def camera_add(project_id):
+    """Add a new camera feed (RTSP or Telegram)."""
+    from app.models.models import CameraFeed
+    from app.models.enums import CameraFeedType
+
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    feed_type_str = request.form.get('feed_type', 'rtsp')
+    name          = request.form.get('name', '').strip()
+    rtsp_url      = request.form.get('rtsp_url', '').strip()
+    interval      = int(request.form.get('interval', 60))
+
+    if not name:
+        flash('Kameraname ist erforderlich.', 'error')
+        return redirect(url_for('project.cameras', project_id=project_id))
+
+    try:
+        feed_type = CameraFeedType(feed_type_str)
+    except ValueError:
+        feed_type = CameraFeedType.RTSP
+
+    cam = CameraFeed(
+        project_id=project_id,
+        name=name,
+        feed_type=feed_type,
+        rtsp_url=rtsp_url or None,
+        is_active=True,
+        check_interval_minutes=interval,
+    )
+    db.session.add(cam)
+    db.session.commit()
+
+    flash(f'Kamera "{name}" hinzugefügt.', 'success')
+    return redirect(url_for('project.cameras', project_id=project_id))
+
+
+@project_bp.route('/<project_id>/cameras/<camera_id>/delete', methods=['POST'])
+@login_required
+def camera_delete(project_id, camera_id):
+    from app.models.models import CameraFeed
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+    cam = CameraFeed.query.filter_by(id=camera_id, project_id=project_id).first_or_404()
+    db.session.delete(cam)
+    db.session.commit()
+    flash('Kamera entfernt.', 'info')
+    return redirect(url_for('project.cameras', project_id=project_id))
+
+
+@project_bp.route('/<project_id>/cameras/<camera_id>/snapshot', methods=['POST'])
+@login_required
+def camera_snapshot_now(project_id, camera_id):
+    """Trigger an immediate RTSP snapshot."""
+    from app.models.models import CameraFeed
+    from app.services.camera_service import process_camera_snapshot
+
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+    cam = CameraFeed.query.filter_by(id=camera_id, project_id=project_id).first_or_404()
+
+    if not cam.rtsp_url:
+        flash('Keine RTSP-URL konfiguriert.', 'error')
+        return redirect(url_for('project.cameras', project_id=project_id))
+
+    snap = process_camera_snapshot(cam, project)
+    if snap:
+        flash(f'Snapshot gespeichert. Fortschritt: {snap.ai_progress_pct or "?"}%', 'success')
+    else:
+        flash('Snapshot fehlgeschlagen. Kamera-Verbindung prüfen.', 'error')
+    return redirect(url_for('project.cameras', project_id=project_id))
