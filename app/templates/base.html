@@ -34,6 +34,9 @@
         <span style="background:var(--c-coral);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:3px;font-weight:600;">{{ nav_pending_outbox }}</span>
         {% endif %}
       </a>
+      <a href="{{ url_for('provider_admin.login') }}" class="nav-link {% if request.blueprint == 'provider_admin' %}active{% endif %}" style="font-size:12px;color:var(--text-m);">
+        Anbieter-Portal
+      </a>
     </div>
     <div class="nav-user">
       <a href="{{ url_for('dashboard.profile') }}" class="nav-link" style="font-size:13px;color:var(--text-m);">

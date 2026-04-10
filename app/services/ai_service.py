@@ -576,6 +576,7 @@ def ask_ai(
     mode: ActionMode = ActionMode.CONFIRMATION_REQUIRED,
     extra_context: dict = None,
     user_id: str = None,
+    system_override: str = None,
 ) -> dict:
     """
     Основной вызов Claude API.
@@ -651,7 +652,7 @@ FINANZIERUNG:
         response = client.messages.create(
             model='claude-sonnet-4-20250514',
             max_tokens=2000,
-            system=SYSTEM_PROMPT,
+            system=system_override or SYSTEM_PROMPT,
             messages=messages,
         )
         duration_ms = int(time.time() * 1000) - start_ms

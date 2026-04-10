@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anbieter-Login | BauNavigator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <style>
+    body { background: #f4f6fb; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .login-box {
+      background: #fff; border-radius: 12px; border: 1px solid #e8eaf0;
+      padding: 40px 36px; width: 100%; max-width: 400px; box-shadow: 0 4px 24px rgba(26,32,53,.07);
+    }
+    .login-logo { text-align: center; margin-bottom: 24px; }
+    .login-logo .icon { font-size: 32px; }
+    .login-logo h1 { font-size: 20px; color: #1a2035; margin: 8px 0 2px; }
+    .login-logo p { font-size: 13px; color: #6b7280; margin: 0; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 5px; }
+    .form-group input { width: 100%; box-sizing: border-box; }
+    .btn-full { width: 100%; }
+  </style>
+</head>
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;min-width:320px;">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">⌂</div>
+      <h1>BauNavigator</h1>
+      <p>Anbieter-Portal Login</p>
+    </div>
+
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label>E-Mail-Adresse</label>
+        <input type="email" name="email" class="form-control" required autocomplete="email" placeholder="ihre@firma.de">
+      </div>
+      <div class="form-group">
+        <label>Passwort</label>
+        <input type="password" name="password" class="form-control" required autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" style="margin-top:8px;">Anmelden</button>
+    </form>
+
+    <p style="text-align:center;margin-top:20px;font-size:13px;color:#6b7280;">
+      Noch kein Konto?
+      <a href="{{ url_for('providers.register_provider') }}" style="color:var(--c-blue);">Jetzt registrieren</a>
+    </p>
+    <p style="text-align:center;margin-top:8px;font-size:12px;">
+      <a href="{{ url_for('dashboard.index') }}" style="color:#9ca3af;">← Zur Hauptseite</a>
+    </p>
+  </div>
+</body>
+</html>

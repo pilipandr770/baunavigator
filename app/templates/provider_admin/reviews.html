@@ -1,0 +1,65 @@
+{% extends 'provider_admin/base.html' %}
+{% block title %}Bewertungen — {{ provider.company_name }}{% endblock %}
+{% block page_title %}Bewertungen{% endblock %}
+
+{% block content %}
+<div class="pa-card" style="padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:24px;">
+  <div style="text-align:center;">
+    <div style="font-size:36px;font-weight:700;color:#1a2035;">{{ '%.1f'|format(provider.rating_avg|float) }}</div>
+    <div style="font-size:13px;color:#6b7280;">Ø Bewertung</div>
+  </div>
+  <div style="width:1px;background:#e8eaf0;height:48px;"></div>
+  <div style="text-align:center;">
+    <div style="font-size:28px;font-weight:700;color:#1a2035;">{{ provider.review_count }}</div>
+    <div style="font-size:13px;color:#6b7280;">Bewertungen</div>
+  </div>
+  <div style="margin-left:auto;font-size:13px;color:#6b7280;">
+    ⭐⭐⭐⭐⭐ = {{ provider.rating_avg|float|round(1) }} von 5
+  </div>
+</div>
+
+<div class="pa-card" style="padding:0;overflow:hidden;">
+  {% if reviews %}
+  <table class="pa-table">
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Bewertung</th>
+        <th>Titel</th>
+        <th>Text</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reviews %}
+      <tr>
+        <td style="white-space:nowrap;font-size:13px;">{{ r.created_at.strftime('%d.%m.%Y') }}</td>
+        <td>
+          {% for i in range(r.rating) %}⭐{% endfor %}
+          <span style="font-size:12px;color:#6b7280;">({{ r.rating }}/5)</span>
+        </td>
+        <td style="font-weight:600;font-size:14px;">{{ r.title or '—' }}</td>
+        <td style="font-size:13px;color:#374151;max-width:240px;">{{ r.text or '—' }}</td>
+        <td>
+          {% if r.is_published %}
+          <span class="badge badge-won">Veröffentlicht</span>
+          {% else %}
+          <span class="badge badge-lost">Ausgeblendet</span>
+          {% endif %}
+          {% if r.verified_deal %}
+          <span class="badge" style="background:#dbeafe;color:#1d4ed8;">✓ Verifiziert</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#9ca3af;">
+    <div style="font-size:36px;margin-bottom:12px;">⭐</div>
+    <p style="margin:0;font-size:14px;">Noch keine Bewertungen eingegangen.</p>
+    <p style="font-size:13px;margin-top:6px;">Bitten Sie zufriedene Kunden, eine Bewertung zu hinterlassen.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

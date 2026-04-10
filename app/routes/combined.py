@@ -3,11 +3,11 @@ from flask_login import login_required, current_user
 from app import db
 from app.models.models import (
     Project, ProjectStage, MessageOutbox, Provider,
-    Gemeinde, BebauungsplanZone, ProviderService, ProviderReview
+    Gemeinde, BebauungsplanZone, ProviderService, ProviderReview, Lead
 )
 from app.models.enums import (
     StageKey, OutboxStatus, VerifiedStatus, STAGE_LABELS,
-    ProviderCategory, PROVIDER_CATEGORY_LABELS, ActionMode, ActionType
+    ProviderCategory, PROVIDER_CATEGORY_LABELS, ActionMode, ActionType, LeadStatus,
 )
 from app.services.ai_service import (
     ask_ai, generate_bauamt_letter, analyze_zone,
@@ -16,6 +16,50 @@ from app.services.ai_service import (
 
 # ─── AI Blueprint ──────────────────────────────────────────────────────────────
 ai_bp = Blueprint('ai', __name__)
+
+
+@ai_bp.route('/provider-chat/<provider_id>', methods=['POST'])
+def provider_chat(provider_id):
+    """Public AI chatbot endpoint for provider mini-sites. No login required."""
+    from app.models.enums import PROVIDER_CATEGORY_LABELS
+    provider = Provider.query.get_or_404(provider_id)
+    if not provider.chatbot_enabled:
+        return jsonify({'error': 'Chatbot deaktiviert.'}), 403
+
+    data = request.get_json() or {}
+    user_message = data.get('message', '').strip()
+    if not user_message:
+        return jsonify({'error': 'Keine Nachricht.'}), 400
+    if len(user_message) > 500:
+        return jsonify({'error': 'Nachricht zu lang.'}), 400
+
+    # Build system prompt
+    svc = provider.services.first()
+    category_label = PROVIDER_CATEGORY_LABELS.get(svc.category, svc.category.value) if svc else 'Fachbetrieb'
+    plz_str = ', '.join(svc.service_area_plz) if svc and svc.service_area_plz else 'Hessen'
+
+    system = (
+        f"Du bist der freundliche KI-Assistent von {provider.company_name} ({category_label}). "
+        f"Das Unternehmen arbeitet in folgenden Postleitzahlgebieten: {plz_str}. "
+        f"Beschreibung: {provider.description or 'Fachbetrieb im Baubereich'}. "
+        "Beantworte Anfragen von Bauherren auf Deutsch, präzise und hilfreich. "
+        "Weise bei Preisanfragen darauf hin, dass ein individuelles Angebot notwendig ist. "
+        "Verweis für Terminanfragen auf das Kontaktformular auf dieser Seite. "
+    )
+    if provider.chatbot_prompt:
+        system += f"\nWeitere Anweisungen: {provider.chatbot_prompt}"
+
+    from app.services.ai_service import ask_ai
+    result = ask_ai(
+        user_message=user_message,
+        project=None,
+        stage_key=None,
+        action_type=ActionType.GENERAL_CONSULT,
+        mode=ActionMode.AUTONOMOUS,
+        user_id=None,
+        system_override=system,
+    )
+    return jsonify({'answer': result.get('response', 'Fehler beim Abruf.')})
 
 
 @ai_bp.route('/chat', methods=['POST'])
@@ -151,12 +195,12 @@ def generate_document(project_id, stage_key):
 
     # Build a tailored AI prompt per doc type
     doc_type_prompts = {
-        DocType.BAUANTRAG: (
+        DocType.GENEHMIGUNG: (
             "Erstellen Sie einen vollständigen Bauantrag-Entwurf nach HBO Hessen. "
             "Nutzen Sie die Projektdaten. Gliedern Sie klar: Antragsteller, Grundstück, "
             "Vorhaben, Begründung, Anlagen-Liste. Formeller Stil."
         ),
-        DocType.BAUGENEHMIGUNG: (
+        DocType.BRIEF: (
             "Erstellen Sie eine Checkliste aller Unterlagen, die für die Baugenehmigung "
             "nach HBO Hessen §§ 64–66 benötigt werden, bezogen auf dieses Projekt."
         ),
@@ -165,7 +209,7 @@ def generate_document(project_id, stage_key):
             "und VOB/B für diesen Bauschritt. Weisen Sie explizit darauf hin, dass dieser "
             "Entwurf vor Unterzeichnung von einem Rechtsanwalt geprüft werden sollte."
         ),
-        DocType.GUTACHTEN: (
+        DocType.STATIK: (
             "Erstellen Sie eine strukturierte Vorlage für ein Baugutachten zu diesem Schritt. "
             "Gliedern Sie: Aufgabenstellung, Befund, Bewertung, Empfehlungen."
         ),
@@ -191,7 +235,7 @@ def generate_document(project_id, stage_key):
         project=project,
         stage_key=sk,
         action_type=ActionType.DOCUMENT_GENERATE,
-        mode=ActionMode.DIRECT,
+        mode=ActionMode.AUTONOMOUS,
         user_id=current_user.id,
     )
 
@@ -469,10 +513,12 @@ def detail(provider_id):
     reviews = provider.reviews.filter_by(is_published=True).order_by(
         ProviderReview.created_at.desc()
     ).limit(10).all()
+    stage_labels_list = list(STAGE_LABELS.items())
     return render_template('providers/detail.html',
                            provider=provider,
                            reviews=reviews,
-                           category_labels=PROVIDER_CATEGORY_LABELS)
+                           category_labels=PROVIDER_CATEGORY_LABELS,
+                           stage_labels_list=stage_labels_list)
 
 
 @providers_bp.route('/<provider_id>/review', methods=['POST'])
@@ -523,6 +569,64 @@ def submit_review(provider_id):
     return redirect(url_for('providers.detail', provider_id=provider_id))
 
 
+@providers_bp.route('/<provider_id>/contact', methods=['POST'])
+@login_required
+def contact_provider(provider_id):
+    """Create a Lead when a logged-in user sends a contact request from the provider detail page."""
+    provider = Provider.query.filter_by(id=provider_id, is_active=True).first_or_404()
+
+    note = request.form.get('note', '').strip()[:1000] or None
+    stage_key_str = request.form.get('stage_key', '').strip()
+    stage_key = None
+    if stage_key_str:
+        try:
+            stage_key = StageKey(stage_key_str)
+        except ValueError:
+            pass
+
+    # Prevent duplicate open leads
+    existing = Lead.query.filter_by(
+        user_id=current_user.id,
+        provider_id=provider_id,
+        status=LeadStatus.SENT,
+    ).first()
+    if existing:
+        flash('Sie haben bereits eine offene Anfrage an diesen Anbieter.', 'info')
+        return redirect(url_for('providers.detail', provider_id=provider_id))
+
+    lead = Lead(
+        user_id=current_user.id,
+        provider_id=provider_id,
+        stage_key=stage_key,
+        status=LeadStatus.SENT,
+        note=note,
+    )
+    db.session.add(lead)
+    db.session.commit()
+
+    # Notify provider by email
+    try:
+        from flask_mail import Message as MailMessage
+        from app import mail
+        mail.send(MailMessage(
+            subject=f'Neue Anfrage auf BauNavigator von {current_user.full_name or current_user.email}',
+            recipients=[provider.contact_email],
+            body=(
+                f"Sie haben eine neue Kontaktanfrage erhalten.\n\n"
+                f"Von: {current_user.full_name or ''} ({current_user.email})\n"
+                f"Bauschritt: {stage_key.value if stage_key else '—'}\n"
+                f"Nachricht: {note or '—'}\n\n"
+                f"Antworten Sie direkt auf diese E-Mail oder verwalten Sie die Anfrage in Ihrem Anbieter-Portal:\n"
+                f"https://baunavigator.de/provider-admin/"
+            ),
+        ))
+    except Exception:
+        pass  # Email delivery is best-effort
+
+    flash('Ihre Anfrage wurde gesendet. Der Anbieter meldet sich bei Ihnen.', 'success')
+    return redirect(url_for('providers.detail', provider_id=provider_id))
+
+
 @providers_bp.route('/register', methods=['GET', 'POST'])
 def register_provider():
     if request.method == 'POST':
@@ -532,9 +636,23 @@ def register_provider():
         category_str = request.form.get('category', '').strip()
         plz = request.form.get('plz', '').strip()
         city = request.form.get('city', '').strip()
+        password = request.form.get('password', '')
+        password_confirm = request.form.get('password_confirm', '')
 
         if not company_name or not contact_email:
             flash('Name und E-Mail sind Pflichtfelder.', 'danger')
+            return render_template('providers/register.html',
+                                   categories=ProviderCategory,
+                                   category_labels=PROVIDER_CATEGORY_LABELS)
+
+        if len(password) < 8:
+            flash('Das Passwort muss mindestens 8 Zeichen haben.', 'danger')
+            return render_template('providers/register.html',
+                                   categories=ProviderCategory,
+                                   category_labels=PROVIDER_CATEGORY_LABELS)
+
+        if password != password_confirm:
+            flash('Die Passwörter stimmen nicht überein.', 'danger')
             return render_template('providers/register.html',
                                    categories=ProviderCategory,
                                    category_labels=PROVIDER_CATEGORY_LABELS)
@@ -556,6 +674,7 @@ def register_provider():
             website=request.form.get('website', '').strip() or None,
             description=request.form.get('description', '').strip() or None,
         )
+        provider.set_password(password)
         db.session.add(provider)
         db.session.flush()  # get provider.id
 

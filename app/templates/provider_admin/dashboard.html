@@ -1,0 +1,119 @@
+{% extends 'provider_admin/base.html' %}
+{% block title %}Dashboard — {{ provider.company_name }}{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="pa-stat-grid">
+  <div class="pa-stat">
+    <div class="pa-stat-num">{{ total_leads }}</div>
+    <div class="pa-stat-label">Anfragen gesamt</div>
+  </div>
+  <div class="pa-stat">
+    <div class="pa-stat-num" style="color:#4f46e5;">{{ new_leads }}</div>
+    <div class="pa-stat-label">Neue Anfragen</div>
+  </div>
+  <div class="pa-stat">
+    <div class="pa-stat-num" style="color:#065f46;">{{ won_leads }}</div>
+    <div class="pa-stat-label">Aufträge gewonnen</div>
+  </div>
+  <div class="pa-stat">
+    <div class="pa-stat-num" style="color:#92400e;">{{ review_count }}</div>
+    <div class="pa-stat-label">Bewertungen</div>
+  </div>
+</div>
+
+<!-- Status Info -->
+{% if not provider.portal_active %}
+<div class="pa-card" style="border-left:4px solid #f59e0b;background:#fffbeb;">
+  <strong>⏳ Konto in Prüfung</strong>
+  <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">Ihr Konto wird gerade überprüft. Sobald die Verifizierung abgeschlossen ist, erhalten Sie eine Bestätigungs-E-Mail.</p>
+</div>
+{% elif provider.verified_status.value != 'verified' %}
+<div class="pa-card" style="border-left:4px solid #f59e0b;background:#fffbeb;">
+  <strong>⏳ Verifizierung ausstehend</strong>
+  <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">Wir prüfen Ihre Angaben. Nach der Freischaltung erscheint Ihr Profil in der Anbietersuche.</p>
+</div>
+{% endif %}
+
+<!-- Profile completeness -->
+<div class="pa-card">
+  <h3>Profil-Vollständigkeit</h3>
+  {% set done = [] %}
+  {% if provider.company_name %}{% set _ = done.append(1) %}{% endif %}
+  {% if provider.description %}{% set _ = done.append(1) %}{% endif %}
+  {% if provider.contact_phone %}{% set _ = done.append(1) %}{% endif %}
+  {% if provider.website %}{% set _ = done.append(1) %}{% endif %}
+  {% if provider.tagline %}{% set _ = done.append(1) %}{% endif %}
+  {% set pct = (done|length / 5 * 100)|int %}
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+    <div style="flex:1;background:#f0f2f7;border-radius:20px;height:10px;overflow:hidden;">
+      <div style="width:{{ pct }}%;background:{% if pct >= 80 %}#10b981{% elif pct >= 50 %}#f59e0b{% else %}#ef4444{% endif %};height:100%;border-radius:20px;transition:width .3s;"></div>
+    </div>
+    <span style="font-weight:700;color:#1a2035;">{{ pct }}%</span>
+  </div>
+  <div style="font-size:13px;color:#6b7280;">
+    ✅ Firmenname
+    {% if provider.description %}✅{% else %}⬜{% endif %} Beschreibung
+    {% if provider.contact_phone %}✅{% else %}⬜{% endif %} Telefon
+    {% if provider.website %}✅{% else %}⬜{% endif %} Website
+    {% if provider.tagline %}✅{% else %}⬜{% endif %} Slogan
+  </div>
+  {% if pct < 100 %}
+  <a href="{{ url_for('provider_admin.profile') }}" class="btn btn-secondary btn-sm" style="margin-top:12px;">Profil vervollständigen →</a>
+  {% endif %}
+</div>
+
+<!-- Recent Leads -->
+<div class="pa-card">
+  <h3>Letzte Anfragen</h3>
+  {% if recent_leads %}
+  <table class="pa-table">
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Bauschritt</th>
+        <th>Status</th>
+        <th>Notiz</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lead in recent_leads %}
+      <tr>
+        <td style="white-space:nowrap;">{{ lead.created_at.strftime('%d.%m.%Y') }}</td>
+        <td>{{ lead.stage_key.value if lead.stage_key else '—' }}</td>
+        <td><span class="badge badge-{{ lead.status.value }}">{{ lead.status.value|capitalize }}</span></td>
+        <td style="color:#6b7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ lead.note or '—' }}</td>
+        <td><a href="{{ url_for('provider_admin.leads') }}" class="btn btn-secondary btn-sm">Details</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#9ca3af;font-size:14px;text-align:center;padding:24px 0;">Noch keine Anfragen eingegangen.</p>
+  {% endif %}
+  <div style="margin-top:12px;">
+    <a href="{{ url_for('provider_admin.leads') }}" style="font-size:13px;color:var(--c-blue);">Alle Anfragen ansehen →</a>
+  </div>
+</div>
+
+<!-- Quick links -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+  <a href="{{ url_for('provider_admin.slots') }}" class="pa-card" style="text-decoration:none;color:inherit;text-align:center;">
+    <div style="font-size:28px;margin-bottom:8px;">📅</div>
+    <div style="font-size:14px;font-weight:600;">Terminslots</div>
+    <div style="font-size:12px;color:#6b7280;">Verfügbarkeit verwalten</div>
+  </a>
+  <a href="{{ url_for('provider_admin.chatbot') }}" class="pa-card" style="text-decoration:none;color:inherit;text-align:center;">
+    <div style="font-size:28px;margin-bottom:8px;">🤖</div>
+    <div style="font-size:14px;font-weight:600;">KI-Chatbot</div>
+    <div style="font-size:12px;color:#6b7280;">Einstellungen</div>
+  </a>
+  <a href="{{ url_for('providers.detail', provider_id=provider.id) }}" class="pa-card" style="text-decoration:none;color:inherit;text-align:center;" target="_blank">
+    <div style="font-size:28px;margin-bottom:8px;">🌐</div>
+    <div style="font-size:14px;font-weight:600;">Mini-Website</div>
+    <div style="font-size:12px;color:#6b7280;">Als Besucher ansehen</div>
+  </a>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends 'provider_admin/base.html' %}
+{% block title %}Profil bearbeiten — {{ provider.company_name }}{% endblock %}
+{% block page_title %}Mein Profil{% endblock %}
+
+{% block content %}
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="pa-card">
+    <h3>Unternehmensangaben</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <label class="form-label">Firmenname *</label>
+        <input type="text" name="company_name" class="form-control" value="{{ provider.company_name }}" required>
+      </div>
+      <div>
+        <label class="form-label">Rechtsform</label>
+        <select name="legal_form" class="form-control">
+          <option value="">— Bitte wählen —</option>
+          {% for f in ['GmbH', 'GmbH & Co. KG', 'GbR', 'UG (haftungsbeschränkt)', 'Einzelunternehmen', 'AG', 'KG'] %}
+          <option value="{{ f }}" {% if provider.legal_form == f %}selected{% endif %}>{{ f }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Telefon</label>
+        <input type="tel" name="contact_phone" class="form-control" value="{{ provider.contact_phone or '' }}" placeholder="+49 6151 123456">
+      </div>
+      <div>
+        <label class="form-label">Website</label>
+        <input type="url" name="website" class="form-control" value="{{ provider.website or '' }}" placeholder="https://ihre-firma.de">
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <label class="form-label">Slogan / Tagline</label>
+      <input type="text" name="tagline" class="form-control" value="{{ provider.tagline or '' }}" placeholder="Ihr starker Partner beim Hausbau in Hessen" maxlength="255">
+    </div>
+    <div style="margin-top:16px;">
+      <label class="form-label">Beschreibung (wird auf Ihrer Mini-Website angezeigt)</label>
+      <textarea name="description" class="form-control" rows="5" placeholder="Stellen Sie Ihr Unternehmen vor …">{{ provider.description or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="pa-card">
+    <h3>Leistungen & Einzugsgebiet</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <label class="form-label">Hauptkategorie</label>
+        <select name="category" class="form-control">
+          <option value="">— Bitte wählen —</option>
+          {% for cat in categories %}
+          <option value="{{ cat.value }}"
+            {% if service and service.category == cat %}selected{% endif %}>
+            {{ category_labels[cat] }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Postleitzahlen (kommagetrennt)</label>
+        <input type="text" name="plz" class="form-control" value="{{ current_plz }}" placeholder="64283, 64289, 64295">
+        <small style="color:#9ca3af;font-size:11px;">Einzugsgebiet – für die Anbietersuche</small>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;">
+    <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+    <a href="{{ url_for('provider_admin.dashboard') }}" class="btn btn-secondary">Abbrechen</a>
+  </div>
+</form>
+
+<div class="pa-card" style="margin-top:24px;background:#f8f9fc;">
+  <h3>Öffentliches Profil</h3>
+  <p style="font-size:14px;color:#6b7280;margin:0 0 12px;">Ihr Profil ist für Bauherren sichtbar unter:</p>
+  <a href="{{ url_for('providers.detail', provider_id=provider.id) }}" target="_blank" class="btn btn-secondary btn-sm">
+    🌐 Mini-Website ansehen →
+  </a>
+</div>
+{% endblock %}

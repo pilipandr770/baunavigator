@@ -1,0 +1,65 @@
+{% extends 'provider_admin/base.html' %}
+{% block title %}KI-Chatbot — {{ provider.company_name }}{% endblock %}
+{% block page_title %}KI-Chatbot Einstellungen{% endblock %}
+
+{% block content %}
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="pa-card">
+    <h3>Chatbot aktivieren</h3>
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="chatbot_enabled" value="1" {% if provider.chatbot_enabled %}checked{% endif %}>
+        <span>✅ Chatbot aktiviert</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="chatbot_enabled" value="0" {% if not provider.chatbot_enabled %}checked{% endif %}>
+        <span>⏸ Deaktiviert</span>
+      </label>
+    </div>
+    <p style="font-size:13px;color:#6b7280;margin:0;">
+      Wenn aktiviert, erscheint auf Ihrer Mini-Website ein KI-Chatbot-Widget,
+      das automatisch Fragen von Bauherren beantwortet.
+    </p>
+  </div>
+
+  <div class="pa-card">
+    <h3>Begrüßungsnachricht</h3>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 12px;">
+      Diese Nachricht wird als erste Nachricht des Chatbots angezeigt.
+    </p>
+    <input type="text" name="chatbot_greeting" class="form-control"
+      value="{{ provider.chatbot_greeting or '' }}"
+      maxlength="500"
+      placeholder="Hallo! Ich bin der KI-Assistent von {{ provider.company_name }}. Wie kann ich Ihnen helfen?">
+  </div>
+
+  <div class="pa-card">
+    <h3>Individuelle Anweisungen (System-Prompt)</h3>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 12px;">
+      Beschreiben Sie dem KI-Assistenten, wie er sich verhalten soll.
+      Er kennt Ihre Firma, Ihre Leistungen und Ihren Einzugsbereich automatisch.
+    </p>
+    <textarea name="chatbot_prompt" class="form-control" rows="8"
+      placeholder="Beispiel: Beantworte alle Fragen auf Deutsch. Weise bei konkreten Preisanfragen darauf hin, dass ein persönliches Angebot notwendig ist. Verweise für Terminvereinbarungen auf unser Kontaktformular.">{{ provider.chatbot_prompt or '' }}</textarea>
+    <small style="color:#9ca3af;font-size:11px;">
+      Der KI-Assistent erhält automatisch Ihre Unternehmensdaten, Leistungsübersicht und PLZ-Einzugsbereich.
+    </small>
+  </div>
+
+  <div class="pa-card" style="background:#f0f9ff;border-color:#bae6fd;">
+    <h3 style="color:#0369a1;">Vorschau Chat-Verhalten</h3>
+    <p style="font-size:13px;color:#0369a1;margin:0;">
+      Der Chatbot auf Ihrer Mini-Website beantwortet Fragen wie:<br>
+      <em>„Was sind Ihre Preise?", „Arbeiten Sie in meiner PLZ?",
+      „Welche Zertifizierungen haben Sie?", „Wann kann ich einen Termin machen?"</em>
+    </p>
+  </div>
+
+  <div style="display:flex;gap:12px;">
+    <button type="submit" class="btn btn-primary">Einstellungen speichern</button>
+    <a href="{{ url_for('provider_admin.dashboard') }}" class="btn btn-secondary">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

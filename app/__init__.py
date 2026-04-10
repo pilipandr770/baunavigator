@@ -84,6 +84,7 @@ def create_app():
     from app.routes.ai import ai_bp
     from app.routes.outbox import outbox_bp
     from app.routes.webhooks import webhooks_bp
+    from app.routes.provider_admin import provider_admin_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/')
@@ -93,6 +94,7 @@ def create_app():
     app.register_blueprint(ai_bp, url_prefix='/ai')
     app.register_blueprint(outbox_bp, url_prefix='/outbox')
     app.register_blueprint(webhooks_bp, url_prefix='/webhooks')
+    app.register_blueprint(provider_admin_bp, url_prefix='/provider-admin')
 
     # ── Shell context ─────────────────────────────────
     @app.shell_context_processor

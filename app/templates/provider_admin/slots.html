@@ -1,0 +1,80 @@
+{% extends 'provider_admin/base.html' %}
+{% block title %}Terminslots — {{ provider.company_name }}{% endblock %}
+{% block page_title %}Freie Terminslots{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+
+  <!-- Add slot form -->
+  <div class="pa-card">
+    <h3>Neuen Termin hinzufügen</h3>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="add">
+      <div style="margin-bottom:12px;">
+        <label class="form-label">Datum *</label>
+        <input type="date" name="date" class="form-control" required>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label class="form-label">Uhrzeit *</label>
+        <input type="time" name="time" class="form-control" required>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label class="form-label">Dauer (Minuten)</label>
+        <select name="duration" class="form-control">
+          <option value="30">30 min</option>
+          <option value="60" selected>60 min</option>
+          <option value="90">90 min</option>
+          <option value="120">120 min</option>
+        </select>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label class="form-label">Notiz (optional)</label>
+        <input type="text" name="note" class="form-control" placeholder="z.B. Erstberatung Neubau">
+      </div>
+      <button type="submit" class="btn btn-primary">Termin hinzufügen</button>
+    </form>
+  </div>
+
+  <!-- Existing slots -->
+  <div class="pa-card">
+    <h3>Aktuelle Terminslots</h3>
+    {% set slots = provider.available_slots or [] %}
+    {% if slots %}
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      {% for slot in slots %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:#f8f9fc;border-radius:8px;border:1px solid #e8eaf0;">
+        <div>
+          <div style="font-weight:600;font-size:14px;color:#1a2035;">
+            📅 {{ slot.date }} &nbsp; 🕐 {{ slot.time }}
+          </div>
+          <div style="font-size:12px;color:#6b7280;margin-top:3px;">
+            {{ slot.duration_min }} min
+            {% if slot.note %} · {{ slot.note }}{% endif %}
+          </div>
+        </div>
+        <form method="post" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="index" value="{{ loop.index0 }}">
+          <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:none;"
+            onclick="return confirm('Termin löschen?')">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:#9ca3af;text-align:center;padding:24px 0;font-size:14px;">
+      Noch keine Termine eingetragen.
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="pa-card" style="margin-top:4px;background:#f0f9ff;border-color:#bae6fd;">
+  <p style="font-size:13px;color:#0369a1;margin:0;">
+    💡 Die freien Terminslots werden auf Ihrer öffentlichen Mini-Website angezeigt.
+    Bauherren können Sie direkt über das Kontaktformular ansprechen.
+  </p>
+</div>
+{% endblock %}

@@ -334,6 +334,15 @@ class Provider(db.Model):
     registered_at = db.Column(db.DateTime(timezone=True), default=now_utc, nullable=False)
     suspended_at = db.Column(db.DateTime(timezone=True))
     suspended_reason = db.Column(db.Text)
+    # Provider portal fields
+    password_hash = db.Column(db.String(255))
+    portal_active = db.Column(db.Boolean, default=False, nullable=False)
+    tagline = db.Column(db.String(255))
+    hero_image_path = db.Column(db.String(500))
+    chatbot_enabled = db.Column(db.Boolean, default=True)
+    chatbot_greeting = db.Column(db.String(500))
+    chatbot_prompt = db.Column(db.Text)
+    available_slots = db.Column(db.JSON)  # list of {date, time, duration_min, note}
 
     # Relations
     licenses = db.relationship('ProviderLicense', back_populates='provider',
@@ -353,6 +362,12 @@ class Provider(db.Model):
             ProviderLicense.valid_until < today
         ).count()
         return expired == 0
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
     def __repr__(self):
         return f'<Provider {self.company_name}>'
