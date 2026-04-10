@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin | BauNavigator{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <style>
+    :root { --adm-bg: #0f172a; --adm-sidebar: #1e293b; --adm-accent: #3b82f6; }
+    body { margin: 0; background: #f1f5f9; font-family: inherit; }
+    .adm-wrap { display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .adm-sidebar {
+      width: 230px; flex-shrink: 0;
+      background: var(--adm-sidebar); color: #cbd5e1;
+      display: flex; flex-direction: column;
+    }
+    .adm-logo {
+      padding: 22px 20px 16px;
+      font-size: 14px; font-weight: 700; color: #fff;
+      border-bottom: 1px solid rgba(255,255,255,.06); line-height: 1.4;
+    }
+    .adm-logo small { display: block; font-size: 10px; color: #64748b; font-weight: 400; letter-spacing: .5px; text-transform: uppercase; margin-top: 2px; }
+    .adm-nav { flex: 1; padding: 10px 0; }
+    .adm-nav a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; color: #94a3b8; text-decoration: none;
+      font-size: 13px; transition: background .12s, color .12s;
+    }
+    .adm-nav a:hover, .adm-nav a.active { background: rgba(255,255,255,.06); color: #fff; }
+    .adm-nav .ico { width: 18px; text-align: center; font-size: 15px; }
+    .adm-nav .sep { height: 1px; background: rgba(255,255,255,.06); margin: 8px 0; }
+    .adm-footer { padding: 14px 20px; border-top: 1px solid rgba(255,255,255,.06); }
+    .adm-footer a { color: #475569; font-size: 12px; text-decoration: none; }
+    .adm-footer a:hover { color: #94a3b8; }
+
+    /* Main */
+    .adm-main { flex: 1; display: flex; flex-direction: column; overflow-x: hidden; }
+    .adm-topbar {
+      background: #fff; border-bottom: 1px solid #e2e8f0;
+      padding: 14px 28px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .adm-topbar-title { font-size: 17px; font-weight: 700; color: #0f172a; }
+    .adm-content { padding: 28px; flex: 1; }
+
+    /* Cards */
+    .adm-card { background: #fff; border-radius: 10px; border: 1px solid #e2e8f0; padding: 22px; margin-bottom: 20px; }
+    .adm-card h3 { margin: 0 0 14px; font-size: 14px; color: #0f172a; font-weight: 700; }
+
+    /* Stat grid */
+    .adm-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .adm-stat { background: #fff; border-radius: 10px; border: 1px solid #e2e8f0; padding: 18px 16px; }
+    .adm-stat-num { font-size: 26px; font-weight: 800; color: #0f172a; }
+    .adm-stat-label { font-size: 11px; color: #64748b; margin-top: 3px; text-transform: uppercase; letter-spacing: .4px; }
+
+    /* Table */
+    .adm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .adm-table th { text-align: left; padding: 9px 12px; background: #f8fafc; color: #475569; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    .adm-table td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; color: #1e293b; vertical-align: middle; }
+    .adm-table tr:last-child td { border-bottom: none; }
+    .adm-table tr:hover td { background: #fafafa; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-pending { background: #fef3c7; color: #92400e; }
+    .badge-verified { background: #d1fae5; color: #065f46; }
+    .badge-rejected { background: #fee2e2; color: #991b1b; }
+    .badge-suspended { background: #f3f4f6; color: #374151; }
+    .badge-free { background: #f1f5f9; color: #475569; }
+    .badge-pro { background: #dbeafe; color: #1d4ed8; }
+    .badge-expert { background: #ede9fe; color: #6d28d9; }
+    .badge-sent { background: #dbeafe; color: #1d4ed8; }
+    .badge-viewed { background: #fef3c7; color: #92400e; }
+    .badge-won { background: #d1fae5; color: #065f46; }
+    .badge-lost { background: #fee2e2; color: #991b1b; }
+
+    /* Btn small */
+    .btn-xs { padding: 4px 10px; font-size: 11px; border-radius: 5px; border: none; cursor: pointer; font-weight: 600; }
+    .btn-activate { background: #d1fae5; color: #065f46; }
+    .btn-activate:hover { background: #a7f3d0; }
+    .btn-reject { background: #fee2e2; color: #991b1b; }
+    .btn-reject:hover { background: #fecaca; }
+    .btn-suspend { background: #fef3c7; color: #92400e; }
+    .btn-suspend:hover { background: #fde68a; }
+    .btn-pw { background: #ede9fe; color: #6d28d9; }
+    .btn-pw:hover { background: #ddd6fe; }
+
+    /* Inline form */
+    .inline-form { display: inline; }
+
+    @media (max-width: 768px) {
+      .adm-sidebar { display: none; }
+      .adm-stats { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+<div class="adm-wrap">
+  <aside class="adm-sidebar">
+    <div class="adm-logo">
+      ⚙ BauNavigator
+      <small>Admin Panel</small>
+    </div>
+    <nav class="adm-nav">
+      <a href="{{ url_for('admin.dashboard') }}" class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+        <span class="ico">📊</span> Dashboard
+      </a>
+      <div class="sep"></div>
+      <a href="{{ url_for('admin.providers') }}" class="{% if 'provider' in request.endpoint %}active{% endif %}">
+        <span class="ico">🏢</span> Anbieter
+      </a>
+      <a href="{{ url_for('admin.users') }}" class="{% if request.endpoint == 'admin.users' %}active{% endif %}">
+        <span class="ico">👥</span> Nutzer
+      </a>
+      <a href="{{ url_for('admin.leads') }}" class="{% if request.endpoint == 'admin.leads' %}active{% endif %}">
+        <span class="ico">📋</span> Leads
+      </a>
+      <div class="sep"></div>
+      <a href="{{ url_for('dashboard.index') }}" target="_blank">
+        <span class="ico">🌐</span> Zur Website
+      </a>
+    </nav>
+    <div class="adm-footer">
+      <a href="{{ url_for('admin.logout') }}">Abmelden</a>
+    </div>
+  </aside>
+
+  <div class="adm-main">
+    <div class="adm-topbar">
+      <div class="adm-topbar-title">{% block page_title %}Admin{% endblock %}</div>
+      <div style="font-size:12px;color:#64748b;">🔐 Admin-Session aktiv</div>
+    </div>
+    <div class="adm-content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}" style="margin-bottom:14px;">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

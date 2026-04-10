@@ -1,0 +1,61 @@
+{% extends 'admin/base.html' %}
+{% block title %}Nutzer — Admin{% endblock %}
+{% block page_title %}Nutzer{% endblock %}
+
+{% block content %}
+<div class="adm-card">
+  <!-- Filter bar -->
+  <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
+    <a href="{{ url_for('admin.users') }}" style="text-decoration:none;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;{% if not request.args.get('plan') %}background:#3b82f6;color:#fff;{% else %}background:#f1f5f9;color:#475569;{% endif %}">Alle ({{ total }})</a>
+    {% for plan_val, plan_label in plan_opts %}
+    <a href="{{ url_for('admin.users', plan=plan_val) }}" style="text-decoration:none;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;{% if request.args.get('plan')==plan_val %}background:#3b82f6;color:#fff;{% else %}background:#f1f5f9;color:#475569;{% endif %}">{{ plan_label }}</a>
+    {% endfor %}
+  </div>
+
+  <table class="adm-table">
+    <thead>
+      <tr>
+        <th>E-Mail</th>
+        <th>Name</th>
+        <th>Plan</th>
+        <th>Projekte</th>
+        <th>E-Mail bestätigt</th>
+        <th>Registriert</th>
+        <th>Aktiv</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td style="font-size:13px;">{{ u.email }}</td>
+        <td style="font-size:13px;">{{ u.full_name or '—' }}</td>
+        <td>
+          {% if u.subscription_tier %}
+          <span class="badge badge-{{ u.subscription_tier.value }}">{{ u.subscription_tier.value }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td style="text-align:center;">{{ u.projects|length }}</td>
+        <td style="text-align:center;">
+          {% if u.email_confirmed %}<span style="color:#10b981;font-size:15px;">✓</span>{% else %}<span style="color:#ef4444;font-size:15px;">✗</span>{% endif %}
+        </td>
+        <td style="font-size:12px;white-space:nowrap;">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
+        <td style="text-align:center;">
+          {% if u.is_active %}<span style="color:#10b981;font-size:15px;">✓</span>{% else %}<span style="color:#ef4444;font-size:15px;">✗</span>{% endif %}
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('admin.toggle_user_active', user_id=u.id) }}" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" style="font-size:11px;padding:4px 10px;border-radius:5px;cursor:pointer;border:none;font-weight:600;{% if u.is_active %}background:#fef3c7;color:#92400e;{% else %}background:#d1fae5;color:#065f46;{% endif %}">
+              {% if u.is_active %}Sperren{% else %}Entsperren{% endif %}
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:30px;">Keine Nutzer gefunden.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

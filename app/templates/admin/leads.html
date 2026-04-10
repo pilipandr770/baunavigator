@@ -1,0 +1,36 @@
+{% extends 'admin/base.html' %}
+{% block title %}Leads — Admin{% endblock %}
+{% block page_title %}Leads (letzte 100){% endblock %}
+
+{% block content %}
+<div class="adm-card">
+  <table class="adm-table">
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Nutzer</th>
+        <th>Anbieter</th>
+        <th>Bauschritt</th>
+        <th>Status</th>
+        <th>Preis €</th>
+        <th>Notiz</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in leads %}
+      <tr>
+        <td style="font-size:12px;white-space:nowrap;">{{ l.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        <td style="font-size:12px;">{{ l.user.email if l.user else l.user_id[:8]+'…' }}</td>
+        <td style="font-size:12px;font-weight:600;">{{ l.provider.company_name if l.provider else '—' }}</td>
+        <td style="font-size:12px;">{{ l.stage_key.value if l.stage_key else '—' }}</td>
+        <td><span class="badge badge-{{ l.status.value }}">{{ l.status.value }}</span></td>
+        <td style="font-size:13px;text-align:right;">{{ '%.2f'|format(l.price_charged) if l.price_charged else '—' }}</td>
+        <td style="font-size:12px;color:#64748b;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ l.note or '' }}">{{ l.note or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px;">Keine Leads vorhanden.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

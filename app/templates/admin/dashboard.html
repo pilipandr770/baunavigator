@@ -1,0 +1,140 @@
+{% extends 'admin/base.html' %}
+{% block title %}Dashboard — Admin{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="adm-stats">
+  <div class="adm-stat">
+    <div class="adm-stat-num">{{ stats.users_total }}</div>
+    <div class="adm-stat-label">Nutzer gesamt</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num" style="color:#3b82f6;">{{ stats.pro_users }}</div>
+    <div class="adm-stat-label">Pro/Expert Nutzer</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num">{{ stats.projects_total }}</div>
+    <div class="adm-stat-label">Projekte</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num">{{ stats.providers_total }}</div>
+    <div class="adm-stat-label">Anbieter gesamt</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num" style="color:#f59e0b;">{{ stats.providers_pending }}</div>
+    <div class="adm-stat-label">Anbieter ausstehend</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num" style="color:#10b981;">{{ stats.providers_verified }}</div>
+    <div class="adm-stat-label">Anbieter verifiziert</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num">{{ stats.leads_total }}</div>
+    <div class="adm-stat-label">Leads gesamt</div>
+  </div>
+  <div class="adm-stat">
+    <div class="adm-stat-num" style="color:#6366f1;">{{ stats.leads_new }}</div>
+    <div class="adm-stat-label">Neue Leads</div>
+  </div>
+</div>
+
+<!-- Pending providers -->
+{% if recent_providers %}
+<div class="adm-card">
+  <h3>⏳ Neue Anbieter — Verifizierung ausstehend</h3>
+  <table class="adm-table">
+    <thead>
+      <tr>
+        <th>Firma</th><th>E-Mail</th><th>Registriert</th><th>Passwort?</th><th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in recent_providers %}
+      <tr>
+        <td><a href="{{ url_for('admin.provider_detail', provider_id=p.id) }}" style="font-weight:600;color:#1e293b;">{{ p.company_name }}</a></td>
+        <td style="color:#64748b;">{{ p.contact_email }}</td>
+        <td style="font-size:12px;color:#94a3b8;white-space:nowrap;">{{ p.registered_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        <td>
+          {% if p.password_hash %}
+            <span style="color:#10b981;font-size:12px;">✓ Gesetzt</span>
+          {% else %}
+            <span style="color:#ef4444;font-size:12px;">✗ Fehlt</span>
+          {% endif %}
+        </td>
+        <td style="white-space:nowrap;">
+          <form method="post" action="{{ url_for('admin.activate_provider', provider_id=p.id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-xs btn-activate">✓ Aktivieren</button>
+          </form>
+          <button class="btn-xs btn-reject" onclick="showReject('{{ p.id }}', '{{ p.company_name|e }}')">✗ Ablehnen</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="margin-top:12px;">
+    <a href="{{ url_for('admin.providers') }}" style="font-size:13px;color:#3b82f6;">Alle Anbieter →</a>
+  </div>
+</div>
+{% else %}
+<div class="adm-card" style="border-left:4px solid #10b981;background:#f0fdf4;">
+  <p style="margin:0;font-size:14px;color:#065f46;">✅ Keine ausstehenden Verifizierungsanfragen.</p>
+</div>
+{% endif %}
+
+<!-- Recent users -->
+<div class="adm-card">
+  <h3>👥 Neue Nutzer</h3>
+  <table class="adm-table">
+    <thead>
+      <tr><th>E-Mail</th><th>Name</th><th>Plan</th><th>Bestätigt</th><th>Registriert</th></tr>
+    </thead>
+    <tbody>
+      {% for u in recent_users %}
+      <tr>
+        <td style="font-size:13px;">{{ u.email }}</td>
+        <td>{{ u.full_name or '—' }}</td>
+        <td><span class="badge badge-{{ u.subscription_tier.value }}">{{ u.subscription_tier.value.upper() }}</span></td>
+        <td>{% if u.email_confirmed %}<span style="color:#10b981;">✓</span>{% else %}<span style="color:#ef4444;">✗</span>{% endif %}</td>
+        <td style="font-size:12px;color:#94a3b8;white-space:nowrap;">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="margin-top:12px;">
+    <a href="{{ url_for('admin.users') }}" style="font-size:13px;color:#3b82f6;">Alle Nutzer →</a>
+  </div>
+</div>
+
+<!-- Reject modal (simple inline) -->
+<div id="reject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:28px;width:400px;max-width:90vw;">
+    <h3 style="margin:0 0 12px;font-size:15px;" id="reject-title">Anbieter ablehnen</h3>
+    <form id="reject-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="margin-bottom:14px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:5px;">Begründung (optional)</label>
+        <textarea name="reason" rows="3" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:13px;"
+          placeholder="z.B. Unvollständige Unterlagen, ungültige USt-IdNr. ..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button type="submit" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;">Ablehnen</button>
+        <button type="button" onclick="closeReject()" style="background:#f1f5f9;color:#475569;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function showReject(id, name) {
+  document.getElementById('reject-title').textContent = name + ' ablehnen';
+  document.getElementById('reject-form').action = '/admin/providers/' + id + '/reject';
+  const modal = document.getElementById('reject-modal');
+  modal.style.display = 'flex';
+}
+function closeReject() {
+  document.getElementById('reject-modal').style.display = 'none';
+}
+</script>
+{% endblock %}

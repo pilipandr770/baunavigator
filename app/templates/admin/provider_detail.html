@@ -1,0 +1,141 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ provider.company_name }} — Admin{% endblock %}
+{% block page_title %}Anbieter: {{ provider.company_name }}{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start;">
+
+  <!-- Left column -->
+  <div>
+    <div class="adm-card">
+      <h3>Unternehmensdaten</h3>
+      <table style="width:100%;font-size:13px;border-collapse:collapse;">
+        <tr><td style="padding:7px 0;color:#64748b;width:35%;">ID</td><td style="font-family:monospace;font-size:11px;color:#94a3b8;">{{ provider.id }}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">E-Mail</td><td>{{ provider.contact_email }}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Telefon</td><td>{{ provider.contact_phone or '—' }}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Website</td><td>{% if provider.website %}<a href="{{ provider.website }}" target="_blank">{{ provider.website }}</a>{% else %}—{% endif %}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Rechtsform</td><td>{{ provider.legal_form or '—' }}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">USt-IdNr.</td><td>{{ provider.vat_id or '—' }}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Handelsreg.</td><td>{{ provider.handelsreg_nr or '—' }}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Registriert</td><td>{{ provider.registered_at.strftime('%d.%m.%Y %H:%M') }}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Status</td><td><span class="badge badge-{{ provider.verified_status.value }}">{{ provider.verified_status.value }}</span></td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Portal aktiv</td><td>{% if provider.portal_active %}<span style="color:#10b981;">✓ Ja</span>{% else %}Nein{% endif %}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Passwort</td><td>{% if provider.password_hash %}<span style="color:#10b981;">✓ Gesetzt</span>{% else %}<span style="color:#ef4444;">✗ Nicht gesetzt</span>{% endif %}</td></tr>
+        <tr><td style="padding:7px 0;color:#64748b;">Stripe</td><td style="font-size:11px;color:#94a3b8;">{{ provider.stripe_customer_id or '—' }}</td></tr>
+      </table>
+
+      {% if provider.description %}
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid #f1f5f9;">
+        <div style="font-size:12px;color:#64748b;margin-bottom:6px;">Beschreibung</div>
+        <p style="font-size:13px;margin:0;line-height:1.6;">{{ provider.description }}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Services -->
+    <div class="adm-card">
+      <h3>Leistungen & Einzugsgebiet</h3>
+      {% for svc in provider.services %}
+      <div style="padding:8px 0;border-bottom:1px solid #f1f5f9;">
+        <div style="font-weight:600;font-size:13px;">{{ category_labels.get(svc.category, svc.category.value) }}</div>
+        <div style="font-size:12px;color:#64748b;margin-top:3px;">
+          PLZ: {{ svc.service_area_plz|join(', ') if svc.service_area_plz else '—' }}
+        </div>
+      </div>
+      {% else %}
+      <p style="color:#94a3b8;font-size:13px;margin:0;">Keine Leistungen eingetragen.</p>
+      {% endfor %}
+    </div>
+
+    <!-- Leads -->
+    <div class="adm-card">
+      <h3>Aktuelle Leads ({{ leads|length }})</h3>
+      {% if leads %}
+      <table class="adm-table">
+        <thead><tr><th>Datum</th><th>Nutzer</th><th>Schritt</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for l in leads %}
+          <tr>
+            <td style="font-size:12px;white-space:nowrap;">{{ l.created_at.strftime('%d.%m.%Y') }}</td>
+            <td style="font-size:12px;color:#64748b;">{{ l.user_id[:8] }}…</td>
+            <td style="font-size:12px;">{{ l.stage_key.value if l.stage_key else '—' }}</td>
+            <td><span class="badge badge-{{ l.status.value if l.status.value in ('sent','viewed','won','lost') else 'pending' }}">{{ l.status.value }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:#94a3b8;font-size:13px;">Keine Leads.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right column — actions -->
+  <div>
+    <div class="adm-card">
+      <h3>Aktionen</h3>
+
+      {% if provider.verified_status.value == 'pending' %}
+      <form method="post" action="{{ url_for('admin.activate_provider', provider_id=provider.id) }}" style="margin-bottom:10px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" style="width:100%;background:#10b981;color:#fff;border:none;border-radius:7px;padding:10px;font-weight:700;cursor:pointer;font-size:14px;">✓ Aktivieren & Verifizieren</button>
+      </form>
+      <form method="post" action="{{ url_for('admin.reject_provider', provider_id=provider.id) }}" style="margin-bottom:10px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <textarea name="reason" rows="2" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:6px;padding:7px;font-size:12px;margin-bottom:6px;" placeholder="Ablehnungsgrund …"></textarea>
+        <button type="submit" style="width:100%;background:#ef4444;color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;cursor:pointer;font-size:14px;">✗ Ablehnen</button>
+      </form>
+      {% elif provider.verified_status.value == 'verified' %}
+      <form method="post" action="{{ url_for('admin.suspend_provider', provider_id=provider.id) }}" style="margin-bottom:10px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <textarea name="reason" rows="2" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:6px;padding:7px;font-size:12px;margin-bottom:6px;" placeholder="Sperrgrund …"></textarea>
+        <button type="submit" style="width:100%;background:#f59e0b;color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;cursor:pointer;font-size:14px;">⏸ Sperren</button>
+      </form>
+      {% else %}
+      <form method="post" action="{{ url_for('admin.activate_provider', provider_id=provider.id) }}" style="margin-bottom:10px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" style="width:100%;background:#10b981;color:#fff;border:none;border-radius:7px;padding:10px;font-weight:700;cursor:pointer;font-size:14px;">↺ Reaktivieren</button>
+      </form>
+      {% endif %}
+
+      <hr style="border-color:#f1f5f9;margin:14px 0;">
+
+      <form method="post" action="{{ url_for('admin.set_provider_password', provider_id=provider.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label style="font-size:12px;color:#64748b;font-weight:600;display:block;margin-bottom:6px;">Passwort setzen / ändern</label>
+        <input type="password" name="password" autocomplete="new-password" minlength="8"
+          style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:6px;" placeholder="Neues Passwort …">
+        <button type="submit" style="width:100%;background:#6366f1;color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;cursor:pointer;font-size:13px;">🔑 Passwort speichern</button>
+      </form>
+    </div>
+
+    <!-- Chatbot info -->
+    {% if provider.chatbot_prompt %}
+    <div class="adm-card">
+      <h3>KI-Chatbot</h3>
+      <p style="font-size:12px;color:#64748b;margin:0 0 6px;">Begrüßung:</p>
+      <p style="font-size:13px;margin:0 0 10px;line-height:1.5;">{{ provider.chatbot_greeting or '(Standard)' }}</p>
+      <p style="font-size:12px;color:#64748b;margin:0 0 4px;">System-Prompt:</p>
+      <p style="font-size:12px;color:#475569;background:#f8fafc;border-radius:6px;padding:8px;margin:0;line-height:1.5;">{{ provider.chatbot_prompt[:200] }}{% if provider.chatbot_prompt|length > 200 %}…{% endif %}</p>
+    </div>
+    {% endif %}
+
+    <div class="adm-card">
+      <h3>Reviews ({{ reviews|length }})</h3>
+      {% if reviews %}
+        {% for r in reviews[:3] %}
+        <div style="padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+          {% for i in range(r.rating) %}⭐{% endfor %}
+          <span style="font-size:11px;color:#94a3b8;margin-left:6px;">{{ r.created_at.strftime('%d.%m') }}</span>
+          {% if r.title %}<div style="font-weight:600;margin-top:3px;">{{ r.title }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:#94a3b8;font-size:13px;margin:0;">Keine Reviews.</p>
+      {% endif %}
+    </div>
+
+    <a href="{{ url_for('admin.providers') }}" class="btn-xs btn-pw" style="text-decoration:none;display:inline-block;margin-top:4px;">← Zurück zur Liste</a>
+  </div>
+</div>
+{% endblock %}

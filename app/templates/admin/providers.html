@@ -1,0 +1,122 @@
+{% extends 'admin/base.html' %}
+{% block title %}Anbieter — Admin{% endblock %}
+{% block page_title %}Anbieter{% endblock %}
+
+{% block content %}
+<!-- Filter -->
+<div class="adm-card" style="padding:12px 18px;margin-bottom:16px;">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <span style="font-size:12px;color:#64748b;font-weight:600;">FILTER:</span>
+    <a href="{{ url_for('admin.providers') }}" class="btn-xs {% if not selected_status %}btn-activate{% else %}btn-pw{% endif %}" style="text-decoration:none;">Alle ({{ providers|length }})</a>
+    {% for s in verified_status %}
+    <a href="?status={{ s.value }}" class="btn-xs {% if selected_status == s.value %}btn-activate{% else %}btn-pw{% endif %}" style="text-decoration:none;">{{ s.value|capitalize }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="adm-card" style="padding:0;overflow:hidden;">
+  <table class="adm-table">
+    <thead>
+      <tr>
+        <th>Firma</th>
+        <th>E-Mail</th>
+        <th>Kategorie</th>
+        <th>Status</th>
+        <th>Portal</th>
+        <th>Passwort</th>
+        <th>Registriert</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in providers %}
+      <tr>
+        <td>
+          <a href="{{ url_for('admin.provider_detail', provider_id=p.id) }}" style="font-weight:600;color:#1e293b;text-decoration:none;">
+            {{ p.company_name }}
+          </a>
+          {% if p.legal_form %}<div style="font-size:11px;color:#94a3b8;">{{ p.legal_form }}</div>{% endif %}
+        </td>
+        <td style="font-size:12px;color:#475569;">{{ p.contact_email }}</td>
+        <td style="font-size:12px;">
+          {% set svc = p.services.first() %}
+          {% if svc %}{{ category_labels.get(svc.category, svc.category.value) }}{% else %}—{% endif %}
+        </td>
+        <td><span class="badge badge-{{ p.verified_status.value }}">{{ p.verified_status.value }}</span></td>
+        <td>
+          {% if p.portal_active %}<span style="color:#10b981;font-size:13px;">✓ Aktiv</span>{% else %}<span style="color:#94a3b8;font-size:13px;">—</span>{% endif %}
+        </td>
+        <td>
+          {% if p.password_hash %}<span style="color:#10b981;font-size:12px;">✓</span>{% else %}<span style="color:#ef4444;font-size:12px;">✗</span>{% endif %}
+        </td>
+        <td style="font-size:11px;color:#94a3b8;white-space:nowrap;">{{ p.registered_at.strftime('%d.%m.%Y') }}</td>
+        <td style="white-space:nowrap;">
+          {% if p.verified_status.value == 'pending' %}
+          <form method="post" action="{{ url_for('admin.activate_provider', provider_id=p.id) }}" class="inline-form" style="margin-right:3px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-xs btn-activate" title="Aktivieren">✓</button>
+          </form>
+          <button class="btn-xs btn-reject" onclick="showModal('reject','{{ p.id }}','{{ p.company_name|e }}')" title="Ablehnen">✗</button>
+          {% elif p.verified_status.value == 'verified' %}
+          <button class="btn-xs btn-suspend" onclick="showModal('suspend','{{ p.id }}','{{ p.company_name|e }}')" title="Sperren">⏸</button>
+          {% elif p.verified_status.value in ('rejected','suspended') %}
+          <form method="post" action="{{ url_for('admin.activate_provider', provider_id=p.id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-xs btn-activate" title="Reaktivieren">↺ Reaktivieren</button>
+          </form>
+          {% endif %}
+          <button class="btn-xs btn-pw" style="margin-left:3px;" onclick="showModal('pw','{{ p.id }}','{{ p.company_name|e }}')" title="Passwort setzen">🔑</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Modals -->
+<div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:28px;width:420px;max-width:92vw;">
+    <h3 style="margin:0 0 14px;font-size:15px;" id="modal-title">—</h3>
+    <form id="modal-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div id="modal-reason-wrap" style="margin-bottom:14px;display:none;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:5px;">Begründung (optional)</label>
+        <textarea name="reason" rows="3" id="modal-reason" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:13px;"></textarea>
+      </div>
+      <div id="modal-pw-wrap" style="margin-bottom:14px;display:none;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:5px;">Neues Passwort</label>
+        <input type="password" name="password" id="modal-pw" autocomplete="new-password" minlength="8"
+          style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;font-size:13px;">
+        <small style="color:#94a3b8;font-size:11px;">Mindestens 8 Zeichen</small>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button type="submit" id="modal-submit" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;">OK</button>
+        <button type="button" onclick="closeModal()" style="background:#f1f5f9;color:#475569;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const URLS = {
+  reject:  (id) => `/admin/providers/${id}/reject`,
+  suspend: (id) => `/admin/providers/${id}/suspend`,
+  pw:      (id) => `/admin/providers/${id}/set-password`,
+};
+function showModal(type, id, name) {
+  document.getElementById('modal-form').action = URLS[type](id);
+  document.getElementById('modal-overlay').style.display = 'flex';
+  document.getElementById('modal-reason-wrap').style.display = (type !== 'pw') ? 'block' : 'none';
+  document.getElementById('modal-pw-wrap').style.display = (type === 'pw') ? 'block' : 'none';
+  const titles = { reject: '✗ Ablehnen: ', suspend: '⏸ Sperren: ', pw: '🔑 Passwort für: ' };
+  const colors = { reject: '#ef4444', suspend: '#f59e0b', pw: '#3b82f6' };
+  document.getElementById('modal-title').textContent = titles[type] + name;
+  document.getElementById('modal-submit').style.background = colors[type];
+  document.getElementById('modal-reason').value = '';
+  if (document.getElementById('modal-pw')) document.getElementById('modal-pw').value = '';
+}
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+</script>
+{% endblock %}
