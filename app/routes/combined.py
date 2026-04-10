@@ -18,6 +18,70 @@ from app.services.ai_service import (
 ai_bp = Blueprint('ai', __name__)
 
 
+# ─── Landing Sales Chatbot (public, no auth) ───────────────────────────────────
+
+_LANDING_CHAT_SYSTEM = """Du bist „Bau-Max", der KI-Verkaufsassistent von BauNavigator.
+
+DEINE AUFGABE: Du hilfst Besuchern der Landingpage zu verstehen, ob und wie BauNavigator
+ihnen beim Hausbau helfen kann. Du qualifizierst Leads, erkennst Bedürfnisse und bringst
+sie zur Registrierung.
+
+FÄHIGKEITEN DER PLATTFORM (die du erklären kannst):
+- 35 geführte Bauphasen von der Grundstückssuche bis zur Schlüsselübergabe
+- KI-Assistent nach Hessischer Bauordnung (HBO) – beantwortet Rechtsfragen, generiert Dokumente
+- Interaktive Karte mit 22+ verifizierten Fachleuten (Architekten, Statiker, Notare, Bauunternehmen)
+- Finanzierungsplan mit KfW-Programmen (124, 261, 300) und Tilgungsplan
+- Automatische Deadline-Erinnerungen für kritische Baufristen
+- Direkte Anfragen an Fachleute über die Plattform
+- Bewertungen echter Bauherren für alle Anbieter
+- Pläne: FREE (kostenlos), PRO (19 €/Monat), EXPERT (49 €/Monat)
+- Nur für Bauherren und Fachleute in Hessen
+
+GESPRÄCHSSTRATEGIE:
+1. Begrüße herzlich, stell eine offene Frage zum Bauvorhaben
+2. Erkenne die Bauphase (plant/sucht Grundstück/hat Genehmigung/baut gerade)
+3. Zeige konkret, wie BauNavigator genau THIS helfen kann
+4. Nenne 1-2 spezifische Features die für ihren Fall relevant sind
+5. Lade zur kostenlosen Registrierung ein: "Starten Sie kostenlos unter baunavigator.de/register"
+
+STIL: Freundlich, kompetent, auf Augenhöhe. Keine Werbesprache. Kurze Antworten (max 4 Sätze).
+Antworte auf Deutsch. Falls auf Englisch/Russisch gefragt wird, antworte in der gleichen Sprache.
+
+VERBOTEN: Preise erfinden, Funktionen versprechen die nicht existieren, endlose Texte schreiben.
+"""
+
+
+@ai_bp.route('/landing-chat', methods=['POST'])
+def landing_chat():
+    """Public sales chatbot for the landing page. Rate-limited by IP."""
+    import time
+    from flask import session
+
+    data = request.get_json(silent=True) or {}
+    user_message = (data.get('message') or '').strip()
+    if not user_message:
+        return jsonify({'error': 'empty'}), 400
+    if len(user_message) > 400:
+        return jsonify({'error': 'too_long'}), 400
+
+    # Simple rate limit: max 20 messages per session
+    count = session.get('lnd_chat_count', 0)
+    if count >= 20:
+        return jsonify({'answer': 'Sie haben das Limit für diese Sitzung erreicht. Registrieren Sie sich kostenlos für unbegrenzten Zugang!'})
+    session['lnd_chat_count'] = count + 1
+
+    result = ask_ai(
+        user_message=user_message,
+        project=None,
+        stage_key=None,
+        action_type=ActionType.GENERAL_CONSULT,
+        mode=ActionMode.AUTONOMOUS,
+        user_id=None,
+        system_override=_LANDING_CHAT_SYSTEM,
+    )
+    return jsonify({'answer': result.get('response', 'Entschuldigung, kurzer Fehler. Bitte versuchen Sie es nochmal.')})
+
+
 @ai_bp.route('/provider-chat/<provider_id>', methods=['POST'])
 def provider_chat(provider_id):
     """Public AI chatbot endpoint for provider mini-sites. No login required."""

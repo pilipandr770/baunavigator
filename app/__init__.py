@@ -86,6 +86,7 @@ def create_app():
     from app.routes.webhooks import webhooks_bp
     from app.routes.provider_admin import provider_admin_bp
     from app.routes.admin import admin_bp
+    from app.routes.legal import legal_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/')
@@ -97,6 +98,7 @@ def create_app():
     app.register_blueprint(webhooks_bp, url_prefix='/webhooks')
     app.register_blueprint(provider_admin_bp, url_prefix='/provider-admin')
     app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(legal_bp, url_prefix='/legal')
 
     # ── Shell context ─────────────────────────────────
     @app.shell_context_processor
