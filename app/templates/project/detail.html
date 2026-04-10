@@ -15,6 +15,7 @@
   </div>
   <div class="ml-auto flex gap-8">
     <a href="{{ url_for('project.financing', project_id=project.id) }}" class="btn btn-secondary">Finanzierung</a>
+    <a href="{{ url_for('project.print_project', project_id=project.id) }}" class="btn btn-secondary" target="_blank">🖨 Bericht</a>
     <a href="{{ url_for('outbox.index') }}" class="btn btn-secondary">
       Postausgang
       {% if pending_messages %}<span style="background:var(--c-coral);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">{{ pending_messages }}</span>{% endif %}

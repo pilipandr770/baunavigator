@@ -114,7 +114,61 @@ def create_checkout():
 @dashboard_bp.route('/upgrade/success')
 @login_required
 def upgrade_success():
-    """Erfolgsseite nach der Zahlung."""
-    flash('Vielen Dank! Ihr Abonnement wurde erfolgreich aktiviert.', 'success')
+    """Verify Stripe session and activate subscription tier."""
+    import stripe
+    from datetime import date
+    from app.models.models import Subscription
+    from app.models.enums import SubscriptionStatus
+
+    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+    session_id = request.args.get('session_id')
+
+    if session_id and stripe.api_key and not stripe.api_key.startswith('sk_test_...'):
+        try:
+            session = stripe.checkout.Session.retrieve(
+                session_id,
+                expand=['subscription', 'customer'],
+            )
+            plan_str = session.metadata.get('plan', 'pro')
+            plan = SubscriptionPlan.PRO if plan_str == 'pro' else SubscriptionPlan.EXPERT
+
+            # Update user tier
+            current_user.subscription_tier = plan
+            db.session.flush()
+
+            # Update or create Subscription record
+            sub = current_user.subscription
+            if sub is None:
+                sub = Subscription(user_id=current_user.id)
+                db.session.add(sub)
+
+            sub.plan = plan
+            sub.status = SubscriptionStatus.ACTIVE
+            if session.customer:
+                sub.stripe_customer_id = (
+                    session.customer.id if hasattr(session.customer, 'id')
+                    else session.customer
+                )
+            if session.subscription:
+                stripe_sub = session.subscription
+                sub.stripe_sub_id = (
+                    stripe_sub.id if hasattr(stripe_sub, 'id') else stripe_sub
+                )
+                if hasattr(stripe_sub, 'current_period_end'):
+                    from datetime import datetime
+                    sub.current_period_end = datetime.fromtimestamp(
+                        stripe_sub.current_period_end
+                    ).date()
+
+            db.session.commit()
+            flash(
+                f'Vielen Dank! Ihr {plan.value.upper()}-Abonnement ist jetzt aktiv.',
+                'success',
+            )
+        except stripe.error.StripeError as e:
+            flash(f'Zahlung konnte nicht bestätigt werden: {e.user_message}', 'warning')
+    else:
+        flash('Vielen Dank! Ihr Abonnement wurde erfolgreich aktiviert.', 'success')
+
     return redirect(url_for('dashboard.profile'))
 

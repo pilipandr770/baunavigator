@@ -2,15 +2,23 @@
 {% block title %}Karte Hessen — BauNavigator{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">Karte — Gemeinden Hessen</h1>
-  <p class="page-subtitle">Klicken Sie auf eine Gemeinde um Bebauungsplan-Informationen zu sehen</p>
+  <h1 class="page-title">Karte — Hessen</h1>
+  <p class="page-subtitle">Gemeinden, Bebauungspläne und Fachbetriebe auf einen Blick</p>
+</div>
+
+<!-- Tab switcher -->
+<div class="flex gap-8 mb-16 no-print">
+  <button class="btn btn-primary btn-sm tab-btn active" id="tab-gemeinden" onclick="switchTab('gemeinden')">🏘 Gemeinden</button>
+  <button class="btn btn-secondary btn-sm tab-btn" id="tab-providers" onclick="switchTab('providers')">🔧 Fachbetriebe</button>
 </div>
 
 <div class="grid-2" style="grid-template-columns: 2fr 1fr; gap: 20px;">
   <div>
     <div id="map"></div>
   </div>
-  <div class="card">
+
+  <!-- Gemeinden panel -->
+  <div id="panel-gemeinden" class="card">
     <div class="card-header">
       <div class="card-title" id="map-selected-name">Gemeinde auswählen</div>
       <div class="card-subtitle" id="map-selected-kreis"></div>
@@ -27,6 +35,36 @@
       <button class="btn btn-primary w-full" id="btn-ai-zone">KI: Zone analysieren</button>
     </div>
   </div>
+
+  <!-- Providers panel -->
+  <div id="panel-providers" class="card" style="display:none;">
+    <div class="card-header">
+      <div class="card-title">Fachbetriebe filtern</div>
+    </div>
+    <div style="padding:0 16px 16px;">
+      <select id="provider-cat-filter" class="form-control mb-8" onchange="loadProviders()">
+        <option value="">Alle Kategorien</option>
+        <option value="ARCHITEKT">Architekt</option>
+        <option value="STATIKER">Statiker</option>
+        <option value="ENERGIEBERATER">Energieberater</option>
+        <option value="BAUFIRMA">Baufirma / Rohbau</option>
+        <option value="HANDWERK_ELEKTRO">Elektro</option>
+        <option value="HANDWERK_SANITAER">Sanitär / Heizung</option>
+        <option value="HANDWERK_DACHDECKER">Dachdecker</option>
+        <option value="HANDWERK_MALER">Maler</option>
+        <option value="HANDWERK_FLIESENLEGER">Fliesenleger</option>
+        <option value="HANDWERK_BODENLEGER">Bodenleger</option>
+        <option value="PV_SOLAR">PV / Solar</option>
+        <option value="HEIZUNG">Heizung / Klima</option>
+        <option value="NOTAR">Notar</option>
+        <option value="GUTACHTER">Gutachter</option>
+        <option value="MAKLER">Makler</option>
+        <option value="SMARTHOME">Smart Home</option>
+        <option value="VERSICHERUNG">Versicherung</option>
+      </select>
+      <div id="provider-list" style="max-height:380px;overflow-y:auto;"></div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -34,8 +72,10 @@
 <script>
 const map = initMap('map', { center: [50.65, 9.0], zoom: 8 });
 let selectedGemeinde = null;
+let providerMarkers = [];
+let gemeindeMarkers = [];
 
-// Load gemeinden from API
+// ── Gemeinden ──────────────────────────────────────────────────────────────
 fetch('/map/api/gemeinden')
   .then(r => r.json())
   .then(data => {
@@ -48,9 +88,18 @@ fetch('/map/api/gemeinden')
       div.addEventListener('mouseleave', () => div.style.background = '');
       div.addEventListener('click', () => selectGemeinde(g));
       list.appendChild(div);
+
+      if (g.lat && g.lng) {
+        const marker = L.circleMarker([g.lat, g.lng], {
+          radius: 7, fillColor: '#2563eb', color: '#fff',
+          weight: 2, opacity: 1, fillOpacity: 0.85
+        }).bindPopup(`<b>${g.name}</b><br>${g.landkreis || ''}`);
+        marker.on('click', () => selectGemeinde(g));
+        marker.addTo(map);
+        gemeindeMarkers.push(marker);
+      }
     });
 
-    // Search filter
     document.getElementById('gemeinde-search').addEventListener('input', function() {
       const q = this.value.toLowerCase();
       list.querySelectorAll('div').forEach(d => {
@@ -65,7 +114,8 @@ function selectGemeinde(g) {
   document.getElementById('map-selected-kreis').textContent = g.landkreis || 'Hessen';
   document.getElementById('map-actions').classList.remove('hidden');
 
-  // Load zones
+  if (g.lat && g.lng) map.setView([g.lat, g.lng], 12);
+
   fetch(`/map/api/gemeinde/${g.id}/zones`)
     .then(r => r.json())
     .then(zones => {
@@ -78,6 +128,94 @@ function selectGemeinde(g) {
       el.innerHTML = `<div class="card-title text-small mb-8">Zonen (${zones.length})</div>` +
         zones.map(z => `
           <div style="padding:6px 8px;border-radius:4px;background:var(--c-gray-l);margin-bottom:4px;font-size:11px;">
+            <strong>${z.zone_type}</strong> — ${z.zone_label}<br>
+            GRZ: ${z.grz_max || '—'} · GFZ: ${z.gfz_max || '—'} · Max ${z.max_geschosse || '?'} Geschosse
+          </div>
+        `).join('');
+    });
+}
+
+document.getElementById('btn-ai-zone')?.addEventListener('click', () => {
+  if (!selectedGemeinde) return;
+  alert('Bitte zuerst ein Projekt öffnen und die Zone dort analysieren.');
+});
+
+// ── Providers ──────────────────────────────────────────────────────────────
+function loadProviders() {
+  const cat = document.getElementById('provider-cat-filter').value;
+  const url = '/map/api/providers' + (cat ? `?category=${cat}` : '');
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      // Remove old markers
+      providerMarkers.forEach(m => map.removeLayer(m));
+      providerMarkers = [];
+
+      const list = document.getElementById('provider-list');
+      list.innerHTML = '';
+
+      if (data.length === 0) {
+        list.innerHTML = '<p class="text-small text-muted" style="padding:8px;">Keine Fachbetriebe gefunden.</p>';
+        return;
+      }
+
+      data.forEach(p => {
+        // Map marker
+        if (p.lat && p.lng) {
+          const m = L.circleMarker([p.lat, p.lng], {
+            radius: 8, fillColor: '#059669', color: '#fff',
+            weight: 2, opacity: 1, fillOpacity: 0.9
+          }).bindPopup(
+            `<b>${p.name}</b><br>` +
+            p.categories.join(', ') +
+            `<br>⭐ ${p.rating.toFixed(1)} (${p.reviews} Bew.)` +
+            `<br><a href="${p.url}" target="_blank">Profil ansehen</a>`
+          );
+          m.addTo(map);
+          providerMarkers.push(m);
+        }
+
+        // List entry
+        const div = document.createElement('div');
+        div.style.cssText = 'padding:8px;border-bottom:1px solid var(--border);font-size:12px;';
+        div.innerHTML = `
+          <div style="font-weight:600;">${p.name}</div>
+          <div style="color:var(--text-m);">${p.categories.join(' · ')}</div>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            ${p.rating > 0 ? `<span>⭐ ${p.rating.toFixed(1)} (${p.reviews})</span>` : ''}
+            <a href="${p.url}" style="color:var(--c-blue);margin-left:auto;">Profil →</a>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    });
+}
+
+// ── Tab switcher ───────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('panel-gemeinden').style.display = tab === 'gemeinden' ? '' : 'none';
+  document.getElementById('panel-providers').style.display = tab === 'providers' ? '' : 'none';
+  document.getElementById('tab-gemeinden').className = tab === 'gemeinden'
+    ? 'btn btn-primary btn-sm tab-btn active'
+    : 'btn btn-secondary btn-sm tab-btn';
+  document.getElementById('tab-providers').className = tab === 'providers'
+    ? 'btn btn-primary btn-sm tab-btn active'
+    : 'btn btn-secondary btn-sm tab-btn';
+
+  // Show/hide gemeinde markers
+  gemeindeMarkers.forEach(m => tab === 'gemeinden' ? m.addTo(map) : map.removeLayer(m));
+
+  if (tab === 'providers') {
+    // Remove gemeinde markers, load providers
+    gemeindeMarkers.forEach(m => map.removeLayer(m));
+    loadProviders();
+  } else {
+    providerMarkers.forEach(m => map.removeLayer(m));
+    gemeindeMarkers.forEach(m => m.addTo(map));
+  }
+}
+</script>
+{% endblock %}
             <strong>${z.zone_type}</strong> — ${z.zone_label}<br>
             GRZ: ${z.grz_max || '—'} · GFZ: ${z.gfz_max || '—'} · Max ${z.max_geschosse || '?'} Geschosse
           </div>

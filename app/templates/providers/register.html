@@ -60,6 +60,28 @@
         <input type="url" name="website" class="form-control" placeholder="https://ihre-firma.de">
       </div>
 
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Hauptkategorie <span class="req">*</span></label>
+          <select name="category" class="form-control" required>
+            <option value="">— auswählen —</option>
+            {% for cat in categories %}
+            <option value="{{ cat.value }}">{{ category_labels.get(cat, cat.value) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">PLZ Tätigkeitsgebiet</label>
+          <input type="text" name="plz" class="form-control" placeholder="60311" maxlength="5">
+          <div class="form-hint">Postleitzahl Ihres Hauptstandorts</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Stadt / Ort</label>
+        <input type="text" name="city" class="form-control" placeholder="Frankfurt am Main">
+      </div>
+
       <div class="form-group">
         <label class="form-label">Kurzbeschreibung Ihres Unternehmens</label>
         <textarea name="description" class="form-control" rows="4"

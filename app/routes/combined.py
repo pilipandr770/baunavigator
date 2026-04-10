@@ -364,6 +364,64 @@ def api_zones(gemeinde_id):
     } for z in zones])
 
 
+@map_bp.route('/api/providers')
+@login_required
+def api_providers():
+    """Return verified providers that have geo coordinates (via their PLZ→Gemeinde lookup)."""
+    category = request.args.get('category', '').strip()
+    # Return providers with rating + category; lat/lng come from their primary PLZ Gemeinde lookup
+    q = Provider.query.filter_by(verified_status=VerifiedStatus.VERIFIED, is_active=True)
+    if category:
+        try:
+            cat = ProviderCategory(category)
+            q = q.join(ProviderService).filter(ProviderService.category == cat).distinct()
+        except ValueError:
+            pass
+    providers = q.limit(100).all()
+
+    # Build PLZ → lat/lng cache from Gemeinde table
+    from app.models.models import Gemeinde as _G
+    gemeinden = _G.query.filter(_G.lat.isnot(None)).all()
+    plz_to_coords: dict = {}
+    for g in gemeinden:
+        if g.ags_code:
+            # use first 5 chars of ags_code as approximate PLZ bucket
+            plz_to_coords[g.ags_code[:5]] = (float(g.lat), float(g.lng))
+
+    result = []
+    for p in providers:
+        lat, lng = None, None
+        # Try to get coords from first service area PLZ
+        first_svc = p.services.first()
+        if first_svc and first_svc.service_area_plz:
+            plz_list = first_svc.service_area_plz
+            if isinstance(plz_list, list) and plz_list:
+                coords = plz_to_coords.get(plz_list[0])
+                if coords:
+                    lat, lng = coords
+
+        # Jitter slightly so pins don't stack exactly
+        import random
+        if lat:
+            lat += random.uniform(-0.05, 0.05)
+            lng += random.uniform(-0.05, 0.05)
+
+        categories = [s.category.value for s in p.services.all()]
+        result.append({
+            'id': p.id,
+            'name': p.company_name,
+            'categories': categories,
+            'phone': p.contact_phone or '',
+            'website': p.website or '',
+            'rating': float(p.rating_avg) if p.rating_avg else 0,
+            'reviews': p.review_count or 0,
+            'lat': lat,
+            'lng': lng,
+            'url': f'/providers/{p.id}',
+        })
+    return jsonify(result)
+
+
 # ─── Providers Blueprint ───────────────────────────────────────────────────────
 providers_bp = Blueprint('providers', __name__)
 
@@ -471,9 +529,19 @@ def register_provider():
         company_name = request.form.get('company_name', '').strip()
         contact_email = request.form.get('contact_email', '').strip()
         vat_id = request.form.get('vat_id', '').strip()
+        category_str = request.form.get('category', '').strip()
+        plz = request.form.get('plz', '').strip()
+        city = request.form.get('city', '').strip()
 
         if not company_name or not contact_email:
             flash('Name und E-Mail sind Pflichtfelder.', 'danger')
+            return render_template('providers/register.html',
+                                   categories=ProviderCategory,
+                                   category_labels=PROVIDER_CATEGORY_LABELS)
+
+        # Check duplicate email
+        if Provider.query.filter_by(contact_email=contact_email).first():
+            flash('Diese E-Mail ist bereits registriert.', 'danger')
             return render_template('providers/register.html',
                                    categories=ProviderCategory,
                                    category_labels=PROVIDER_CATEGORY_LABELS)
@@ -482,15 +550,31 @@ def register_provider():
             company_name=company_name,
             contact_email=contact_email,
             vat_id=vat_id or None,
+            handelsreg_nr=request.form.get('handelsreg_nr', '').strip() or None,
             legal_form=request.form.get('legal_form', '').strip() or None,
             contact_phone=request.form.get('contact_phone', '').strip() or None,
             website=request.form.get('website', '').strip() or None,
             description=request.form.get('description', '').strip() or None,
         )
         db.session.add(provider)
-        db.session.commit()
+        db.session.flush()  # get provider.id
 
-        flash('Ihre Registrierung wurde eingereicht. Wir prüfen Ihre Angaben.', 'success')
+        # Save category as ProviderService
+        if category_str:
+            try:
+                cat = ProviderCategory(category_str)
+                svc = ProviderService(
+                    provider_id=provider.id,
+                    category=cat,
+                    service_area_plz=[plz] if plz else None,
+                    description=city or None,
+                )
+                db.session.add(svc)
+            except ValueError:
+                pass
+
+        db.session.commit()
+        flash('Ihre Registrierung wurde eingereicht. Wir prüfen Ihre Angaben und melden uns.', 'success')
         return redirect(url_for('providers.index'))
 
     return render_template('providers/register.html',

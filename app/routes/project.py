@@ -135,6 +135,40 @@ def detail(project_id):
                            pending_messages=pending_messages)
 
 
+@project_bp.route('/<project_id>/print')
+@login_required
+def print_project(project_id):
+    """Printable single-page project summary."""
+    from datetime import date as _date
+    project = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    phases_with_stages = []
+    for phase_key, phase in STAGE_PHASES.items():
+        stage_rows = []
+        for sk in phase['stages']:
+            stage = project.stages.filter_by(stage_key=sk).first()
+            stage_rows.append({
+                'key': sk,
+                'label': STAGE_LABELS.get(sk, sk.value),
+                'stage': stage,
+            })
+        phases_with_stages.append({
+            'key': phase_key,
+            'label': phase['label'],
+            'color': phase['color'],
+            'stages': stage_rows,
+        })
+
+    return render_template('project/print_summary.html',
+                           project=project,
+                           phases=phases_with_stages,
+                           stage_labels=STAGE_LABELS,
+                           project_type_labels=PROJECT_TYPE_LABELS,
+                           today=_date.today())
+
+
 @project_bp.route('/<project_id>/stage/<stage_key>')
 @login_required
 def stage_detail(project_id, stage_key):
@@ -352,11 +386,21 @@ def upload_document(project_id, stage_key):
 @project_bp.route('/document/<doc_id>/download')
 @login_required
 def download_document(doc_id):
+    from io import BytesIO
     doc = Document.query.get_or_404(doc_id)
-    # Security: verify document belongs to current user
     if doc.project.user_id != current_user.id:
         flash('Zugriff verweigert.', 'danger')
         return redirect(url_for('dashboard.index'))
+
+    # AI-generated text draft — serve as .txt
+    if doc.generated_by_ai and doc.ai_draft_content:
+        content_bytes = doc.ai_draft_content.encode('utf-8')
+        return send_file(
+            BytesIO(content_bytes),
+            download_name=doc.original_filename or doc.filename,
+            as_attachment=True,
+            mimetype='text/plain; charset=utf-8',
+        )
 
     if not doc.storage_path or not os.path.exists(doc.storage_path):
         flash('Datei nicht gefunden.', 'danger')
@@ -368,6 +412,22 @@ def download_document(doc_id):
         as_attachment=True,
         mimetype=doc.mime_type or 'application/octet-stream',
     )
+
+
+@project_bp.route('/document/<doc_id>/view')
+@login_required
+def view_ai_document(doc_id):
+    """Inline viewer for AI-generated text documents."""
+    doc = Document.query.get_or_404(doc_id)
+    if doc.project.user_id != current_user.id:
+        flash('Zugriff verweigert.', 'danger')
+        return redirect(url_for('dashboard.index'))
+    if not doc.generated_by_ai or not doc.ai_draft_content:
+        flash('Kein KI-Entwurf vorhanden.', 'warning')
+        return redirect(url_for('project.stage_detail',
+                                project_id=doc.project_id,
+                                stage_key=doc.stage.stage_key.value if doc.stage else ''))
+    return render_template('project/view_ai_doc.html', doc=doc)
 
 
 @project_bp.route('/<project_id>/stage/<stage_key>/checklist/<int:item_index>', methods=['POST'])

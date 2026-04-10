@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Projektbericht — {{ project.title }}{% endblock %}
+
+{% block content %}
+<div class="no-print" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+  <a href="{{ url_for('project.detail', project_id=project.id) }}" class="btn btn-secondary">← Zurück zum Projekt</a>
+  <button onclick="window.print()" class="btn btn-primary">🖨 Drucken / PDF speichern</button>
+</div>
+
+<!-- ═══ PRINT HEADER ═══ -->
+<div class="print-header">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1d4ed8;padding-bottom:12px;margin-bottom:20px;">
+    <div>
+      <div style="font-size:22px;font-weight:700;color:#1d4ed8;">BauNavigator</div>
+      <div style="font-size:11px;color:#6b7280;">Projektbericht — erstellt am {{ today.strftime('%d.%m.%Y') }}</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:16px;font-weight:700;">{{ project.title }}</div>
+      <div style="font-size:11px;color:#6b7280;">{{ current_user.full_name or current_user.email }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PROJECT OVERVIEW ═══ -->
+<div class="print-section">
+  <h2 class="print-h2">Projektübersicht</h2>
+  <table class="print-table">
+    <tbody>
+      <tr><th>Projektname</th><td>{{ project.title }}</td><th>Typ</th><td>{{ project_type_labels.get(project.project_type, project.project_type.value) }}</td></tr>
+      <tr><th>Adresse</th><td>{{ project.address or '—' }}</td><th>PLZ / Ort</th><td>{{ project.address_plz or '' }} {{ project.address_city or '—' }}</td></tr>
+      <tr><th>Grundstück</th><td>{{ project.grundstueck_m2 or '—' }} m²</td><th>Wohnfläche</th><td>{{ project.wohnflaeche_m2 or '—' }} m²</td></tr>
+      <tr><th>Budget</th><td>{% if project.budget_total %}{{ "{:,.0f}".format(project.budget_total|float) }} €{% else %}—{% endif %}</td>
+          <th>Fortschritt</th><td>{{ project.completion_percent() }}% abgeschlossen</td></tr>
+      <tr><th>Aktueller Schritt</th><td colspan="3">{{ stage_labels.get(project.current_stage, project.current_stage.value) }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══ FINANCING ═══ -->
+{% set fin = project.financing %}
+{% if fin %}
+<div class="print-section">
+  <h2 class="print-h2">Finanzierungsplan</h2>
+  <table class="print-table">
+    <tbody>
+      <tr><th>Eigenkapital</th><td>{{ "{:,.0f}".format(fin.eigenkapital|float) if fin.eigenkapital else '—' }} €</td>
+          <th>KfW-Programm</th><td>{{ fin.kfw_program or '—' }}</td></tr>
+      <tr><th>KfW-Betrag</th><td>{{ "{:,.0f}".format(fin.kfw_amount|float) if fin.kfw_amount else '—' }} €</td>
+          <th>Landesförderung</th><td>{{ "{:,.0f}".format(fin.landesfoerderung_amount|float) if fin.landesfoerderung_amount else '—' }} €</td></tr>
+      <tr><th>Bank</th><td>{{ fin.bank_name or '—' }}</td>
+          <th>Darlehen</th><td>{{ "{:,.0f}".format(fin.bank_loan_amount|float) if fin.bank_loan_amount else '—' }} €</td></tr>
+      <tr><th>Zinssatz p.a.</th><td>{{ fin.bank_zinssatz or '—' }} %</td>
+          <th>Laufzeit</th><td>{{ fin.laufzeit_years or '—' }} Jahre</td></tr>
+      {% if fin.monthly_rate %}
+      <tr><th>Monatliche Rate</th><td style="font-weight:700;color:#2563eb;">{{ "{:,.2f}".format(fin.monthly_rate|float) }} €</td>
+          <th>Gesamtfinanzierung</th><td style="font-weight:700;">{{ "{:,.0f}".format(fin.total_financing()) }} €</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ═══ STAGES ═══ -->
+<div class="print-section">
+  <h2 class="print-h2">Bauabschnitte</h2>
+  {% for phase in phases %}
+  <div style="margin-bottom:12px;">
+    <div style="font-weight:700;font-size:13px;background:#f3f4f6;padding:5px 8px;border-radius:4px;margin-bottom:4px;">
+      {{ phase.key }} — {{ phase.label }}
+    </div>
+    <table class="print-table" style="margin-bottom:0;">
+      <thead>
+        <tr>
+          <th style="width:45%;">Bauschritt</th>
+          <th style="width:15%;">Status</th>
+          <th style="width:15%;">Beginn</th>
+          <th style="width:15%;">Abschluss</th>
+          <th style="width:10%;">Frist</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in phase.stages %}
+        {% set s = row.stage %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td>
+            {% if not s %}—
+            {% elif s.status.value == 'done' %}<span style="color:#059669;">✓ Fertig</span>
+            {% elif s.status.value == 'active' %}<span style="color:#2563eb;">▶ Aktiv</span>
+            {% elif s.status.value == 'pending' %}<span style="color:#9ca3af;">○ Offen</span>
+            {% else %}{{ s.status.value }}{% endif %}
+          </td>
+          <td>{{ s.started_at.strftime('%d.%m.%Y') if s and s.started_at else '—' }}</td>
+          <td>{{ s.completed_at.strftime('%d.%m.%Y') if s and s.completed_at else '—' }}</td>
+          <td>{{ s.deadline_at.strftime('%d.%m.%Y') if s and s.deadline_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<div style="margin-top:32px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;display:flex;justify-content:space-between;">
+  <div>Erstellt mit BauNavigator · baunavigator.de</div>
+  <div>{{ today.strftime('%d.%m.%Y') }}</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* Screen styles */
+.print-section { margin-bottom: 28px; }
+.print-h2 { font-size: 15px; font-weight: 700; color: #1d4ed8; border-bottom: 1px solid #dbeafe; padding-bottom: 6px; margin-bottom: 12px; }
+.print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.print-table th, .print-table td { border: 1px solid #e5e7eb; padding: 5px 8px; text-align: left; }
+.print-table th { background: #f9fafb; font-weight: 600; white-space: nowrap; }
+
+/* Print */
+@media print {
+  .no-print { display: none !important; }
+  nav, .sidebar, .flash, .page-header > *:not(.print-header) { display: none !important; }
+  body { font-size: 11px; }
+  .card { box-shadow: none !important; border: none !important; padding: 0 !important; }
+  .print-table { font-size: 10px; }
+  .print-h2 { font-size: 12px; }
+  h1.page-title { display: none; }
+}
+</style>
+{% endblock %}

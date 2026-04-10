@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.original_filename }} — KI-Entwurf{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div class="text-small text-muted mb-8">
+      <a href="{{ url_for('project.stage_detail', project_id=doc.project_id, stage_key=doc.stage.stage_key.value) }}">← Zurück zum Bauschritt</a>
+    </div>
+    <h1 class="page-title">{{ doc.original_filename or 'KI-Entwurf' }}</h1>
+    <p class="text-small text-muted">
+      KI-generierter Entwurf ·
+      {{ doc.uploaded_at.strftime('%d.%m.%Y %H:%M') if doc.uploaded_at else '' }} ·
+      {{ doc.description or '' }}
+    </p>
+  </div>
+  <div class="flex gap-8 no-print">
+    <a href="{{ url_for('project.download_document', doc_id=doc.id) }}" class="btn btn-secondary">
+      ↓ Als .txt herunterladen
+    </a>
+    <button onclick="window.print()" class="btn btn-secondary">🖨 Drucken</button>
+  </div>
+</div>
+
+<div class="card">
+  <div style="background:var(--c-blue-l);border-left:3px solid var(--c-blue);padding:10px 14px;border-radius:4px;font-size:12px;color:var(--c-blue);margin-bottom:16px;">
+    ⚠️ <strong>Rechtlicher Hinweis:</strong> Dieser KI-Entwurf ersetzt keine Rechts-, Steuer- oder Fachberatung.
+    Lassen Sie alle Dokumente vor der Verwendung von einem zugelassenen Fachmann prüfen.
+  </div>
+  <div style="font-family:'Courier New',monospace;font-size:13px;line-height:1.8;white-space:pre-wrap;padding:8px 4px;border-top:1px solid var(--border);">{{ doc.ai_draft_content }}</div>
+</div>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  nav, .sidebar { display: none !important; }
+  .card { box-shadow: none !important; border: 1px solid #ccc !important; }
+}
+</style>
+{% endblock %}
