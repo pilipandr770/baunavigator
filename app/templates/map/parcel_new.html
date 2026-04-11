@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Grundstück eintragen — BauNavigator{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🏗 Grundstück eintragen</h1>
+  <p class="page-subtitle">Tragen Sie Ihr Inserat ein — kostenlos und sofort sichtbar auf der Karte.</p>
+</div>
+
+<div class="grid-2" style="grid-template-columns:1fr 1fr;gap:24px;align-items:start;">
+
+  <!-- Form -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">Inseratsdaten</div></div>
+    <div style="padding:0 20px 20px;">
+      <form id="parcelForm">
+        <!-- Type -->
+        <div class="form-group">
+          <label class="form-label">Angebotsart *</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            {% for pt in parcel_types %}
+            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 12px;border:2px solid var(--border);border-radius:var(--radius);font-size:13px;transition:.15s;"
+                   id="lbl-{{ pt.value }}"
+                   onclick="selectType('{{ pt.value }}')">
+              <input type="radio" name="parcel_type" value="{{ pt.value }}"
+                     {% if loop.first %}checked{% endif %} style="display:none;">
+              {{ parcel_type_labels[pt] }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Title -->
+        <div class="form-group">
+          <label class="form-label">Titel *</label>
+          <input type="text" id="f-title" class="form-control"
+                 placeholder="z.B. Wohnbaugrundstück in ruhiger Lage, 650 m²" required maxlength="300">
+        </div>
+
+        <!-- Location -->
+        <div class="form-group">
+          <label class="form-label">Standort</label>
+          <div class="grid-2" style="gap:8px;">
+            <input type="text" id="f-plz" class="form-control" placeholder="PLZ" maxlength="10">
+            <input type="text" id="f-city" class="form-control" placeholder="Ort / Stadt">
+          </div>
+          <input type="text" id="f-address" class="form-control mt-8"
+                 placeholder="Straße und Hausnummer (optional)">
+          <div class="grid-2" style="gap:8px;margin-top:8px;">
+            <input type="text" id="f-gemarkung" class="form-control" placeholder="Gemarkung (optional)">
+            <input type="text" id="f-flurstueck" class="form-control" placeholder="Flurstück-Nr. (optional)">
+          </div>
+          <div style="margin-top:8px;">
+            <label class="form-label" style="font-size:11px;">Gemeinde zuordnen (optional)</label>
+            <select id="f-gemeinde" class="form-control">
+              <option value="">— Keine Zuordnung —</option>
+              {% for g in gemeinden %}
+              <option value="{{ g.id }}">{{ g.name }} ({{ g.landkreis or 'Hessen' }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Coordinates (from map click) -->
+        <div class="form-group">
+          <label class="form-label">Koordinaten *
+            <span style="font-size:11px;color:var(--text-m);font-weight:400;">(Klick auf Karte rechts)</span>
+          </label>
+          <div class="grid-2" style="gap:8px;">
+            <input type="number" id="f-lat" class="form-control" placeholder="Breitengrad"
+                   step="0.000001" min="49" max="52" required>
+            <input type="number" id="f-lng" class="form-control" placeholder="Längengrad"
+                   step="0.000001" min="7" max="11" required>
+          </div>
+          <div id="coord-hint" style="font-size:11px;color:var(--c-blue);margin-top:4px;display:none;">
+            ✓ Koordinaten gesetzt
+          </div>
+        </div>
+
+        <!-- Size & Price -->
+        <div class="grid-2" style="gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Fläche (m²)</label>
+            <input type="number" id="f-area" class="form-control" placeholder="z.B. 650" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" id="price-label">Kaufpreis (€)</label>
+            <input type="number" id="f-price" class="form-control" placeholder="z.B. 150000" min="0" step="100">
+          </div>
+        </div>
+
+        <!-- Zone type -->
+        <div class="form-group">
+          <label class="form-label">Nutzungsart / Zonierung</label>
+          <select id="f-zone" class="form-control">
+            <option value="">— Bitte wählen —</option>
+            <option value="Wohnbaufläche (W)">Wohnbaufläche (W)</option>
+            <option value="Allgemeines Wohngebiet (WA)">Allgemeines Wohngebiet (WA)</option>
+            <option value="Reines Wohngebiet (WR)">Reines Wohngebiet (WR)</option>
+            <option value="Besonderes Wohngebiet (WB)">Besonderes Wohngebiet (WB)</option>
+            <option value="Mischgebiet (MI)">Mischgebiet (MI)</option>
+            <option value="Dorfgebiet (MD)">Dorfgebiet (MD)</option>
+            <option value="Gewerbegebiet (GE)">Gewerbegebiet (GE)</option>
+            <option value="Landwirtschaft">Landwirtschaft</option>
+            <option value="Außenbereich (§ 35 BauGB)">Außenbereich (§ 35 BauGB)</option>
+            <option value="Sonstiges">Sonstiges</option>
+          </select>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label class="form-label">Beschreibung</label>
+          <textarea id="f-desc" class="form-control" rows="4"
+                    placeholder="Lage, Besonderheiten, Erschließungszustand, Bebauungsplan vorhanden..."></textarea>
+        </div>
+
+        <!-- Contact -->
+        <div style="background:var(--c-gray-l);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-m);margin-bottom:10px;">KONTAKT</div>
+          <div class="form-group mb-8">
+            <input type="text" id="f-cname" class="form-control" placeholder="Name / Firma">
+          </div>
+          <div class="grid-2" style="gap:8px;">
+            <input type="tel" id="f-cphone" class="form-control" placeholder="Telefon">
+            <input type="email" id="f-cemail" class="form-control" placeholder="E-Mail">
+          </div>
+          <input type="url" id="f-cwebsite" class="form-control mt-8" placeholder="Website (optional)">
+        </div>
+
+        <!-- Source selector -->
+        <div class="form-group">
+          <label class="form-label">Ich bin...</label>
+          <select id="f-source" class="form-control">
+            <option value="makler">Makler / Immobilienbüro</option>
+            <option value="gemeinde">Gemeinde / Kommune</option>
+            <option value="privat">Privater Verkäufer</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full mt-8" id="submit-btn">
+          Grundstück eintragen
+        </button>
+        <p style="font-size:11px;color:var(--text-m);margin-top:8px;text-align:center;">
+          Ihr Inserat wird nach kurzer Prüfung freigeschaltet und erscheint auf der Karte.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Map picker -->
+  <div>
+    <div class="card mb-16">
+      <div class="card-header"><div class="card-title">📍 Standort auf Karte setzen</div></div>
+      <div style="padding:0 16px 12px;font-size:12px;color:var(--text-m);">
+        Klicken Sie auf die Karte, um den genauen Standort des Grundstücks zu markieren.
+      </div>
+      <div id="pick-map" style="height:400px;border-radius:0 0 var(--radius) var(--radius);overflow:hidden;"></div>
+    </div>
+
+    <!-- Info box -->
+    <div class="card" style="background:var(--c-blue-l);border:1px solid #bfdbfe;">
+      <div style="padding:16px;">
+        <div style="font-weight:600;margin-bottom:8px;">💡 Hinweis zu Datenverfügbarkeit</div>
+        <p style="font-size:12px;color:var(--text);">
+          Für viele Gemeinden in Hessen gibt es noch keine offenen Grundstücksdaten.
+          Mit Ihrem Inserat helfen Sie mit, die Karte zu füllen.<br><br>
+          Für <strong>Gemeinden ohne Daten</strong> können wir eine Demo-Ansicht erstellen
+          und direkt Kontakt aufnehmen — sprechen Sie uns an.
+        </p>
+        <a href="mailto:info@baunavigator.de?subject=Grundstücksdaten%20Gemeinde"
+           class="btn btn-secondary btn-sm mt-8">Gemeinde vorschlagen</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Success overlay -->
+<div id="success-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:32px;text-align:center;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+    <h3 style="margin-bottom:8px;">Inserat eingereicht!</h3>
+    <p style="color:var(--text-m);font-size:13px;margin-bottom:20px;">Ihr Grundstück wurde erfolgreich eingetragen und wird nach Prüfung auf der Karte angezeigt.</p>
+    <div style="display:flex;gap:8px;justify-content:center;">
+      <a href="/map/?tab=parcels" class="btn btn-primary">Zur Karte</a>
+      <button onclick="document.getElementById('success-overlay').style.display='none'" class="btn btn-secondary">Weiteres eintragen</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// ── Picker map ────────────────────────────────────────────────────────────
+const pickMap = initMap('pick-map', { center: [50.65, 9.0], zoom: 8 });
+let pickMarker = null;
+
+pickMap.on('click', function(e) {
+  const lat = e.latlng.lat.toFixed(6);
+  const lng = e.latlng.lng.toFixed(6);
+  document.getElementById('f-lat').value = lat;
+  document.getElementById('f-lng').value = lng;
+  document.getElementById('coord-hint').style.display = '';
+
+  if (pickMarker) pickMap.removeLayer(pickMarker);
+  pickMarker = L.marker([lat, lng]).addTo(pickMap);
+  pickMap.setView([lat, lng], 14);
+});
+
+// ── Type selection styling ────────────────────────────────────────────────
+const typeColors = {
+  kauf: '#ea580c', miete: '#7c3aed', erbbaurecht: '#0891b2', gemeinde: '#16a34a'
+};
+
+function selectType(val) {
+  document.querySelectorAll('input[name="parcel_type"]').forEach(r => r.checked = r.value === val);
+  document.querySelectorAll('[id^="lbl-"]').forEach(lbl => {
+    const v = lbl.id.replace('lbl-', '');
+    lbl.style.borderColor = v === val ? typeColors[v] : 'var(--border)';
+    lbl.style.background = v === val ? typeColors[v] + '18' : '';
+    lbl.style.fontWeight = v === val ? '600' : '';
+  });
+  // Update price label
+  const priceLabels = { kauf: 'Kaufpreis (€)', miete: 'Jahrespacht (€)', erbbaurecht: 'Erbbauzins/Jahr (€)', gemeinde: 'Kaufpreis (€)' };
+  document.getElementById('price-label').textContent = priceLabels[val] || 'Preis (€)';
+}
+// Activate first type on load
+selectType('kauf');
+
+// ── Form submit ───────────────────────────────────────────────────────────
+document.getElementById('parcelForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const lat = parseFloat(document.getElementById('f-lat').value);
+  const lng = parseFloat(document.getElementById('f-lng').value);
+  if (!lat || !lng) {
+    alert('Bitte setzen Sie den Standort auf der Karte (Klick auf Karte).');
+    return;
+  }
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { alert('Bitte Titel eingeben.'); return; }
+
+  const parcel_type = document.querySelector('input[name="parcel_type"]:checked')?.value;
+
+  const payload = {
+    lat, lng, title, parcel_type,
+    plz: document.getElementById('f-plz').value.trim(),
+    city: document.getElementById('f-city').value.trim(),
+    address: document.getElementById('f-address').value.trim(),
+    gemarkung: document.getElementById('f-gemarkung').value.trim(),
+    flurstueck_nr: document.getElementById('f-flurstueck').value.trim(),
+    gemeinde_id: document.getElementById('f-gemeinde').value || null,
+    area_sqm: parseFloat(document.getElementById('f-area').value) || null,
+    price_eur: parseFloat(document.getElementById('f-price').value) || null,
+    zone_type: document.getElementById('f-zone').value,
+    description: document.getElementById('f-desc').value.trim(),
+    contact_name: document.getElementById('f-cname').value.trim(),
+    contact_phone: document.getElementById('f-cphone').value.trim(),
+    contact_email: document.getElementById('f-cemail').value.trim(),
+    contact_website: document.getElementById('f-cwebsite').value.trim(),
+    source: document.getElementById('f-source').value,
+  };
+
+  btn.disabled = true;
+  btn.textContent = 'Wird eingetragen...';
+
+  try {
+    const resp = await fetch('/map/api/parcels', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || '',
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (resp.ok && data.ok) {
+      document.getElementById('success-overlay').style.display = 'flex';
+      document.getElementById('parcelForm').reset();
+      selectType('kauf');
+      if (pickMarker) { pickMap.removeLayer(pickMarker); pickMarker = null; }
+      document.getElementById('coord-hint').style.display = 'none';
+    } else {
+      alert('Fehler: ' + (data.error || 'Unbekannter Fehler.'));
+    }
+  } catch(err) {
+    alert('Netzwerkfehler. Bitte versuchen Sie es erneut.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Grundstück eintragen';
+  }
+});
+</script>
+{% endblock %}

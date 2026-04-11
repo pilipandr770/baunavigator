@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Meine Inserate — BauNavigator{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+  <div>
+    <h1 class="page-title">🏗 Meine Grundstücks-Inserate</h1>
+    <p class="page-subtitle">Alle Inserate die Sie eingetragen haben</p>
+  </div>
+  <a href="/map/grundstueck/neu" class="btn btn-primary">+ Neues Inserat</a>
+</div>
+
+{% if not parcels %}
+<div class="card" style="text-align:center;padding:48px 24px;">
+  <div style="font-size:48px;margin-bottom:16px;">🏗</div>
+  <h3 style="margin-bottom:8px;">Noch keine Inserate</h3>
+  <p style="color:var(--text-m);margin-bottom:20px;">Tragen Sie Ihr erstes Grundstück ein und es erscheint auf der Karte.</p>
+  <a href="/map/grundstueck/neu" class="btn btn-primary">Jetzt eintragen</a>
+</div>
+{% else %}
+<div style="display:grid;gap:16px;">
+  {% for p in parcels %}
+  <div class="card" style="padding:16px 20px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-weight:700;font-size:15px;">{{ p.title }}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:4px;color:#fff;background:{{ parcel_type_colors[p.parcel_type] }};">
+            {{ parcel_type_labels[p.parcel_type] }}
+          </span>
+          {% if p.is_verified %}
+          <span style="font-size:11px;color:#16a34a;">✓ Verifiziert</span>
+          {% else %}
+          <span style="font-size:11px;color:#f59e0b;">⏳ Prüfung</span>
+          {% endif %}
+          {% if p.status.value == 'reserved' %}
+          <span style="font-size:11px;background:#f59e0b;color:#fff;border-radius:4px;padding:2px 6px;">Reserviert</span>
+          {% elif p.status.value == 'sold' %}
+          <span style="font-size:11px;background:#6b7280;color:#fff;border-radius:4px;padding:2px 6px;">Verkauft</span>
+          {% endif %}
+        </div>
+        <div style="font-size:12px;color:var(--text-m);display:flex;gap:16px;flex-wrap:wrap;">
+          {% if p.plz or p.city %}
+          <span>📍 {{ p.plz }} {{ p.city }}</span>
+          {% endif %}
+          {% if p.area_sqm %}
+          <span>📐 {{ "%.0f"|format(p.area_sqm) }} m²</span>
+          {% endif %}
+          {% if p.price_eur %}
+          <span>💶 {{ "{:,.0f}".format(p.price_eur).replace(",", ".") }} €</span>
+          {% endif %}
+          {% if p.zone_type %}
+          <span>🏘 {{ p.zone_type }}</span>
+          {% endif %}
+          <span>📅 {{ p.created_at.strftime('%d.%m.%Y') if p.created_at else '' }}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;">
+        <a href="/map/?tab=parcels" class="btn btn-secondary btn-sm">Auf Karte</a>
+        <form method="POST" action="/map/api/parcels/{{ p.id }}"
+              onsubmit="return confirm('Inserat löschen?')"
+              style="display:inline;">
+          <input type="hidden" name="_method" value="DELETE">
+          {{ csrf_token() if csrf_token is defined else '' }}
+          <button type="submit" class="btn btn-sm"
+                  style="background:#fee2e2;color:#dc2626;border:none;"
+                  onclick="this.form.submit()">Löschen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

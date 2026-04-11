@@ -1,6 +1,35 @@
 import enum
 
 
+class ParcelType(str, enum.Enum):
+    KAUF        = 'kauf'         # Grundstück kaufen
+    MIETE       = 'miete'        # Grundstück mieten/pachten
+    ERBBAURECHT = 'erbbaurecht'  # Erbbaurecht
+    GEMEINDE    = 'gemeinde'     # Kommunales Wohnbauland
+
+
+PARCEL_TYPE_LABELS = {
+    ParcelType.KAUF:        'Zu verkaufen',
+    ParcelType.MIETE:       'Zu vermieten / Pacht',
+    ParcelType.ERBBAURECHT: 'Erbbaurecht',
+    ParcelType.GEMEINDE:    'Kommunales Wohnbauland',
+}
+
+PARCEL_TYPE_COLORS = {
+    ParcelType.KAUF:        '#ea580c',  # orange
+    ParcelType.MIETE:       '#7c3aed',  # purple
+    ParcelType.ERBBAURECHT: '#0891b2',  # teal
+    ParcelType.GEMEINDE:    '#16a34a',  # green
+}
+
+
+class ParcelStatus(str, enum.Enum):
+    ACTIVE   = 'active'
+    RESERVED = 'reserved'
+    SOLD     = 'sold'
+    INACTIVE = 'inactive'
+
+
 class NotificationType(str, enum.Enum):
     STAGE_CHANGE      = 'stage_change'       # Этап изменён
     LAW_UPDATE        = 'law_update'         # Изменение закона

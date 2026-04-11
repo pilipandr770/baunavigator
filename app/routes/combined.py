@@ -464,6 +464,29 @@ def index():
     return render_template('map/index.html', gemeinden=gemeinden)
 
 
+@map_bp.route('/grundstueck/neu', methods=['GET'])
+@login_required
+def parcel_new():
+    gemeinden = Gemeinde.query.filter_by(land='HE').order_by(Gemeinde.name).all()
+    from app.models.enums import ParcelType, PARCEL_TYPE_LABELS
+    return render_template('map/parcel_new.html',
+                           gemeinden=gemeinden,
+                           parcel_types=ParcelType,
+                           parcel_type_labels=PARCEL_TYPE_LABELS)
+
+
+@map_bp.route('/grundstueck/meine')
+@login_required
+def my_parcels():
+    from app.models.models import Parcel
+    parcels = Parcel.query.filter_by(submitted_by_user_id=current_user.id)\
+        .order_by(Parcel.created_at.desc()).all()
+    from app.models.enums import PARCEL_TYPE_LABELS, PARCEL_TYPE_COLORS
+    return render_template('map/my_parcels.html', parcels=parcels,
+                           parcel_type_labels=PARCEL_TYPE_LABELS,
+                           parcel_type_colors=PARCEL_TYPE_COLORS)
+
+
 @map_bp.route('/api/gemeinden')
 @login_required
 def api_gemeinden():
@@ -557,6 +580,115 @@ def api_providers():
             'url': f'/providers/{p.id}',
         })
     return jsonify(result)
+
+
+@map_bp.route('/api/parcels')
+@login_required
+def api_parcels():
+    """Return active land parcel listings."""
+    from app.models.models import Parcel
+    from app.models.enums import ParcelStatus, ParcelType
+
+    parcel_type = request.args.get('type', '').strip()
+    gemeinde_id = request.args.get('gemeinde_id', '').strip()
+
+    q = Parcel.query.filter_by(status=ParcelStatus.ACTIVE)
+    if parcel_type:
+        try:
+            q = q.filter_by(parcel_type=ParcelType(parcel_type))
+        except ValueError:
+            pass
+    if gemeinde_id:
+        q = q.filter_by(gemeinde_id=gemeinde_id)
+
+    parcels = q.order_by(Parcel.created_at.desc()).limit(200).all()
+    return jsonify([p.to_dict() for p in parcels])
+
+
+@map_bp.route('/api/parcels/<parcel_id>')
+@login_required
+def api_parcel_detail(parcel_id):
+    from app.models.models import Parcel
+    p = Parcel.query.get_or_404(parcel_id)
+    return jsonify(p.to_dict())
+
+
+@map_bp.route('/api/parcels', methods=['POST'])
+@login_required
+def api_parcel_create():
+    from app.models.models import Parcel, now_utc
+    from app.models.enums import ParcelType, ParcelStatus
+    data = request.get_json(silent=True) or {}
+
+    # Validate required fields
+    lat = data.get('lat')
+    lng = data.get('lng')
+    title = (data.get('title') or '').strip()
+    parcel_type_str = data.get('parcel_type', '')
+
+    if not lat or not lng:
+        return jsonify({'error': 'Koordinaten fehlen.'}), 400
+    if not title:
+        return jsonify({'error': 'Titel fehlen.'}), 400
+    try:
+        parcel_type = ParcelType(parcel_type_str)
+    except ValueError:
+        return jsonify({'error': 'Ungültiger Typ.'}), 400
+
+    # Compute price_sqm automatically
+    area = data.get('area_sqm')
+    price = data.get('price_eur')
+    price_sqm = None
+    if area and price:
+        try:
+            price_sqm = round(float(price) / float(area), 2)
+        except (TypeError, ZeroDivisionError):
+            pass
+
+    p = Parcel(
+        lat=float(lat),
+        lng=float(lng),
+        title=title,
+        parcel_type=parcel_type,
+        status=ParcelStatus.ACTIVE,
+        area_sqm=area,
+        price_eur=price,
+        price_sqm=price_sqm,
+        description=data.get('description', ''),
+        zone_type=data.get('zone_type', ''),
+        features=data.get('features', []),
+        address=data.get('address', ''),
+        plz=data.get('plz', ''),
+        city=data.get('city', ''),
+        gemarkung=data.get('gemarkung', ''),
+        flurstueck_nr=data.get('flurstueck_nr', ''),
+        contact_name=data.get('contact_name', ''),
+        contact_email=data.get('contact_email', ''),
+        contact_phone=data.get('contact_phone', ''),
+        contact_website=data.get('contact_website', ''),
+        source=data.get('source', 'makler'),
+        gemeinde_id=data.get('gemeinde_id') or None,
+        submitted_by_user_id=current_user.id,
+        is_verified=False,
+    )
+    db.session.add(p)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': p.id}), 201
+
+
+@map_bp.route('/api/parcels/<parcel_id>', methods=['DELETE', 'POST'])
+@login_required
+def api_parcel_delete(parcel_id):
+    from app.models.models import Parcel
+    p = Parcel.query.get_or_404(parcel_id)
+    if p.submitted_by_user_id != current_user.id and not getattr(current_user, 'is_admin', False):
+        return jsonify({'error': 'Keine Berechtigung.'}), 403
+    db.session.delete(p)
+    db.session.commit()
+    if request.method == 'POST':
+        flash('Inserat gelöscht.', 'info')
+        return redirect(url_for('map.my_parcels'))
+    return jsonify({'ok': True})
 
 
 # ─── Providers Blueprint ───────────────────────────────────────────────────────

@@ -3,13 +3,19 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Karte — Hessen</h1>
-  <p class="page-subtitle">Gemeinden, Bebauungspläne und Fachbetriebe auf einen Blick</p>
+  <p class="page-subtitle">Gemeinden, Bebauungspläne, Fachbetriebe und Grundstücke auf einen Blick</p>
 </div>
 
-<!-- Tab switcher -->
-<div class="flex gap-8 mb-16 no-print">
+<!-- Tab switcher + Layer controls row -->
+<div class="flex gap-8 mb-16 no-print" style="flex-wrap:wrap;align-items:center;">
   <button class="btn btn-primary btn-sm tab-btn active" id="tab-gemeinden" onclick="switchTab('gemeinden')">🏘 Gemeinden</button>
   <button class="btn btn-secondary btn-sm tab-btn" id="tab-providers" onclick="switchTab('providers')">🔧 Fachbetriebe</button>
+  <button class="btn btn-secondary btn-sm tab-btn" id="tab-parcels" onclick="switchTab('parcels')">🏗 Grundstücke</button>
+  <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+    <span style="font-size:11px;color:var(--text-m);font-weight:600;">Kartenlayer:</span>
+    <button class="btn btn-secondary btn-sm" id="btn-layer-alkis" onclick="toggleLayer('alkis')" title="ALKIS Liegenschaftskarte (HVBG)">📐 Flurstücke</button>
+    <button class="btn btn-secondary btn-sm" id="btn-layer-boris" onclick="toggleLayer('boris')" title="BORIS Bodenrichtwerte (HVBG)">💶 Bodenrichtwerte</button>
+  </div>
 </div>
 
 <div class="grid-2" style="grid-template-columns: 2fr 1fr; gap: 20px;">
@@ -64,6 +70,46 @@
         <option value="VERSICHERUNG">Versicherung</option>
       </select>
       <div id="provider-list" style="max-height:380px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- Grundstücke panel -->
+  <div id="panel-parcels" class="card" style="display:none;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="card-title">🏗 Grundstücke</div>
+      <a href="/map/grundstueck/neu" class="btn btn-primary btn-sm">+ Inserat</a>
+    </div>
+    <div style="padding:0 16px 8px;">
+      <select id="parcel-type-filter" class="form-control mb-8" onchange="loadParcels()">
+        <option value="">Alle Typen</option>
+        <option value="kauf">Zu verkaufen</option>
+        <option value="miete">Zu vermieten / Pacht</option>
+        <option value="erbbaurecht">Erbbaurecht</option>
+        <option value="gemeinde">Kommunales Wohnbauland</option>
+      </select>
+      <div id="parcel-count" style="font-size:11px;color:var(--text-m);margin-bottom:8px;"></div>
+      <div id="parcel-list" style="max-height:260px;overflow-y:auto;"></div>
+    </div>
+    <!-- Parcel detail -->
+    <div id="parcel-detail" style="display:none;padding:12px 16px 16px;border-top:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div id="pd-title" style="font-weight:700;font-size:14px;flex:1;"></div>
+        <button onclick="closeParcelDetail()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-m);">✕</button>
+      </div>
+      <div id="pd-badge" style="margin-bottom:8px;"></div>
+      <div id="pd-address" style="font-size:12px;color:var(--text-m);margin-bottom:6px;"></div>
+      <div id="pd-area-price" style="margin-bottom:8px;font-weight:600;"></div>
+      <div id="pd-zone" style="font-size:11px;color:var(--text-m);margin-bottom:8px;"></div>
+      <div id="pd-desc" style="font-size:12px;margin-bottom:12px;white-space:pre-line;max-height:80px;overflow-y:auto;color:var(--text-m);"></div>
+      <div id="pd-contact" style="background:var(--c-blue-l);border-radius:var(--radius);padding:10px;font-size:12px;"></div>
+    </div>
+    <!-- Legend -->
+    <div style="padding:8px 16px 12px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:10px;font-weight:600;color:var(--text-m);width:100%;margin-bottom:2px;">LEGENDE:</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#ea580c;display:inline-block;"></span>Verkauf</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>Miete</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#0891b2;display:inline-block;"></span>Erbbaurecht</span>
+      <span style="font-size:10px;display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Gemeinde</span>
     </div>
   </div>
 </div>
@@ -214,25 +260,169 @@ function loadProviders() {
 
 // ── Tab switcher ───────────────────────────────────────────────────────────
 function switchTab(tab) {
-  document.getElementById('panel-gemeinden').style.display = tab === 'gemeinden' ? '' : 'none';
-  document.getElementById('panel-providers').style.display = tab === 'providers' ? '' : 'none';
-  document.getElementById('tab-gemeinden').className = tab === 'gemeinden'
-    ? 'btn btn-primary btn-sm tab-btn active'
-    : 'btn btn-secondary btn-sm tab-btn';
-  document.getElementById('tab-providers').className = tab === 'providers'
-    ? 'btn btn-primary btn-sm tab-btn active'
-    : 'btn btn-secondary btn-sm tab-btn';
+  const panels = ['gemeinden', 'providers', 'parcels'];
+  panels.forEach(p => {
+    document.getElementById(`panel-${p}`).style.display = p === tab ? '' : 'none';
+    const btn = document.getElementById(`tab-${p}`);
+    if (btn) btn.className = p === tab
+      ? 'btn btn-primary btn-sm tab-btn active'
+      : 'btn btn-secondary btn-sm tab-btn';
+  });
 
-  // Show/hide gemeinde markers
+  // Markers visibility
   gemeindeMarkers.forEach(m => tab === 'gemeinden' ? m.addTo(map) : map.removeLayer(m));
+  providerMarkers.forEach(m => map.removeLayer(m));
+  parcelMarkers.forEach(m => map.removeLayer(m));
 
-  if (tab === 'providers') {
-    // Remove gemeinde markers, load providers
-    gemeindeMarkers.forEach(m => map.removeLayer(m));
-    loadProviders();
+  if (tab === 'providers') loadProviders();
+  if (tab === 'parcels') loadParcels();
+}
+
+// ── Grundstücke ────────────────────────────────────────────────────────────
+let parcelMarkers = [];
+let allParcels = [];
+
+function loadParcels() {
+  const typeFilter = document.getElementById('parcel-type-filter').value;
+  const url = '/map/api/parcels' + (typeFilter ? `?type=${typeFilter}` : '');
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      allParcels = data;
+      // Clear old markers
+      parcelMarkers.forEach(m => map.removeLayer(m));
+      parcelMarkers = [];
+
+      const list = document.getElementById('parcel-list');
+      list.innerHTML = '';
+      document.getElementById('parcel-count').textContent =
+        data.length > 0 ? `${data.length} Inserat${data.length > 1 ? 'e' : ''} gefunden` : 'Keine Inserate gefunden';
+
+      data.forEach(p => {
+        // Map marker
+        const m = L.circleMarker([p.lat, p.lng], {
+          radius: 10, fillColor: p.color, color: '#fff',
+          weight: 2, opacity: 1, fillOpacity: 0.9
+        });
+        m.bindPopup(`
+          <div style="min-width:180px;">
+            <b>${p.title}</b><br>
+            <span style="color:${p.color};font-size:11px;font-weight:600;">${p.parcel_type_label}</span><br>
+            ${p.area_sqm ? `<span>📐 ${p.area_sqm.toLocaleString('de-DE')} m²</span><br>` : ''}
+            ${p.price_eur ? `<span>💶 ${p.price_eur.toLocaleString('de-DE', {style:'currency', currency:'EUR', maximumFractionDigits:0})}</span><br>` : ''}
+            <a href="#" onclick="showParcelDetail('${p.id}');return false;" style="color:#2563eb;">Details ansehen →</a>
+          </div>
+        `);
+        m.on('click', () => showParcelDetail(p.id));
+        m.addTo(map);
+        parcelMarkers.push(m);
+
+        // List entry
+        const div = document.createElement('div');
+        div.style.cssText = 'padding:8px;border-bottom:1px solid var(--border);cursor:pointer;';
+        div.addEventListener('mouseenter', () => div.style.background = 'var(--c-gray-l)');
+        div.addEventListener('mouseleave', () => div.style.background = '');
+        div.addEventListener('click', () => { showParcelDetail(p.id); map.setView([p.lat, p.lng], 14); });
+        div.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="font-weight:600;font-size:12px;flex:1;">${p.title}</div>
+            <span style="font-size:10px;background:${p.color};color:#fff;border-radius:4px;padding:1px 5px;white-space:nowrap;margin-left:6px;">${p.parcel_type_label}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-m);margin-top:2px;">
+            ${p.area_sqm ? `📐 ${p.area_sqm.toLocaleString('de-DE')} m²` : ''}
+            ${p.price_eur ? ` · 💶 ${Math.round(p.price_eur).toLocaleString('de-DE')} €` : ''}
+            ${p.city ? ` · 📍 ${p.city}` : ''}
+          </div>
+        `;
+        list.appendChild(div);
+      });
+
+      if (data.length === 0) {
+        list.innerHTML = `
+          <div style="padding:16px;text-align:center;color:var(--text-m);font-size:12px;">
+            <div style="font-size:32px;margin-bottom:8px;">🏗</div>
+            <div>Noch keine Inserate vorhanden.</div>
+            <a href="/map/grundstueck/neu" class="btn btn-primary btn-sm" style="margin-top:8px;">Jetzt eintragen</a>
+          </div>`;
+      }
+    });
+}
+
+function showParcelDetail(parcelId) {
+  const p = allParcels.find(x => x.id === parcelId);
+  if (!p) return;
+
+  document.getElementById('parcel-detail').style.display = '';
+  document.getElementById('pd-title').textContent = p.title;
+  document.getElementById('pd-badge').innerHTML =
+    `<span style="font-size:11px;background:${p.color};color:#fff;border-radius:4px;padding:2px 8px;font-weight:600;">${p.parcel_type_label}</span>` +
+    (p.status === 'reserved' ? ' <span style="font-size:11px;background:#f59e0b;color:#fff;border-radius:4px;padding:2px 8px;">Reserviert</span>' : '');
+
+  const addrParts = [p.address, p.plz && p.city ? `${p.plz} ${p.city}` : p.city].filter(Boolean);
+  document.getElementById('pd-address').textContent = addrParts.join(', ') || p.gemeinde_name || '';
+
+  const priceParts = [];
+  if (p.area_sqm) priceParts.push(`📐 ${parseFloat(p.area_sqm).toLocaleString('de-DE')} m²`);
+  if (p.price_eur) priceParts.push(`💶 ${parseFloat(p.price_eur).toLocaleString('de-DE', {style:'currency',currency:'EUR',maximumFractionDigits:0})}`);
+  if (p.price_sqm) priceParts.push(`(${parseFloat(p.price_sqm).toLocaleString('de-DE', {maximumFractionDigits:0})} €/m²)`);
+  document.getElementById('pd-area-price').textContent = priceParts.join('  ');
+
+  document.getElementById('pd-zone').textContent = p.zone_type ? `Nutzungsart: ${p.zone_type}` : '';
+  document.getElementById('pd-desc').textContent = p.description || '';
+
+  // Contact block
+  const contactLines = [];
+  if (p.contact_name) contactLines.push(`<div style="font-weight:600;margin-bottom:4px;">📋 ${p.contact_name}</div>`);
+  if (p.contact_phone) contactLines.push(`<a href="tel:${p.contact_phone}" style="color:var(--c-blue);display:block;">📞 ${p.contact_phone}</a>`);
+  if (p.contact_email) contactLines.push(`<a href="mailto:${p.contact_email}" style="color:var(--c-blue);display:block;">✉ ${p.contact_email}</a>`);
+  if (p.contact_website) contactLines.push(`<a href="${p.contact_website}" target="_blank" rel="noopener" style="color:var(--c-blue);display:block;">🌐 Website</a>`);
+  if (p.provider_url) contactLines.push(`<a href="${p.provider_url}" style="color:var(--c-blue);display:block;margin-top:4px;">👤 Makler-Profil ansehen →</a>`);
+  if (contactLines.length === 0) contactLines.push('<div style="color:var(--text-m);">Kein Kontakt angegeben.</div>');
+  document.getElementById('pd-contact').innerHTML =
+    `<div style="font-size:10px;font-weight:600;color:var(--text-m);margin-bottom:6px;">KONTAKT</div>` +
+    contactLines.join('');
+}
+
+function closeParcelDetail() {
+  document.getElementById('parcel-detail').style.display = 'none';
+}
+
+// ── HVBG WMS Layer Controls ────────────────────────────────────────────────
+// ALKIS Liegenschaftskarte — HVBG Open Data WMS (free since 2022)
+const alkisLayer = L.tileLayer.wms(
+  'https://www.geoportal.hessen.de/mapbender/php/wms.php?inspire=1&isobjid=2613&',
+  {
+    layers: 'Liegenschaftskarte_grau',
+    format: 'image/png',
+    transparent: true,
+    opacity: 0.6,
+    attribution: '© HVBG Hessen — Liegenschaftskataster Open Data',
+  }
+);
+// BORIS Bodenrichtwerte — HVBG Open Data WMS
+const borisLayer = L.tileLayer.wms(
+  'https://www.geoportal.hessen.de/mapbender/php/wms.php?inspire=1&isobjid=8243&',
+  {
+    layers: 'Bodenrichtwerte',
+    format: 'image/png',
+    transparent: true,
+    opacity: 0.5,
+    attribution: '© HVBG Hessen — BORIS Bodenrichtwerte Open Data',
+  }
+);
+
+const activeLayers = { alkis: false, boris: false };
+
+function toggleLayer(name) {
+  const layer = name === 'alkis' ? alkisLayer : borisLayer;
+  const btn = document.getElementById(`btn-layer-${name}`);
+  activeLayers[name] = !activeLayers[name];
+  if (activeLayers[name]) {
+    layer.addTo(map);
+    btn.className = 'btn btn-primary btn-sm';
   } else {
-    providerMarkers.forEach(m => map.removeLayer(m));
-    gemeindeMarkers.forEach(m => m.addTo(map));
+    map.removeLayer(layer);
+    btn.className = 'btn btn-secondary btn-sm';
   }
 }
 </script>

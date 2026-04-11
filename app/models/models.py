@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.dialects.postgresql import JSONB
 from app import db, login_manager
 from app.models.enums import (
     SubscriptionPlan, SubscriptionStatus, ProjectType,
@@ -9,7 +10,8 @@ from app.models.enums import (
     OutboxStatus, RecipientType, DocType, ZoneType,
     ProviderCategory, LicenseType, VerifiedStatus,
     ProviderPlan, LeadStatus, FinancingStatus,
-    NotificationType, CameraFeedType
+    NotificationType, CameraFeedType,
+    ParcelType, ParcelStatus,
 )
 
 
@@ -343,7 +345,7 @@ class Provider(db.Model):
     chatbot_enabled = db.Column(db.Boolean, default=True)
     chatbot_greeting = db.Column(db.String(500))
     chatbot_prompt = db.Column(db.Text)
-    available_slots = db.Column(db.JSON)  # list of {date, time, duration_min, note}
+    available_slots = db.Column(JSONB)  # list of {date, time, duration_min, note}
 
     # Relations
     licenses = db.relationship('ProviderLicense', back_populates='provider',
@@ -664,3 +666,88 @@ class LawUpdateLog(db.Model):
 
     source = db.relationship('LawSource', back_populates='logs')
 
+
+# ─────────────────────────────────────────────────────
+# GRUNDSTÜCKE / PARCELS
+# ─────────────────────────────────────────────────────
+
+class Parcel(db.Model):
+    """A land parcel listing — submitted by Makler, Gemeinde, or private seller."""
+    __tablename__ = 'parcels'
+
+    id           = db.Column(db.String(36), primary_key=True, default=new_uuid)
+    gemeinde_id  = db.Column(db.String(36), db.ForeignKey('gemeinden.id'), nullable=True, index=True)
+
+    # ── Location ──────────────────────────────────────
+    lat          = db.Column(db.Numeric(9, 6), nullable=False)
+    lng          = db.Column(db.Numeric(9, 6), nullable=False)
+    address      = db.Column(db.String(500))
+    plz          = db.Column(db.String(10))
+    city         = db.Column(db.String(255))
+    gemarkung    = db.Column(db.String(255))        # Gemarkungsname
+    flurstueck_nr = db.Column(db.String(100))       # Flurstücknummer (optional)
+
+    # ── Basic listing info ────────────────────────────
+    title        = db.Column(db.String(500), nullable=False)
+    parcel_type  = db.Column(db.Enum(ParcelType), nullable=False)
+    status       = db.Column(db.Enum(ParcelStatus), nullable=False, default=ParcelStatus.ACTIVE)
+    area_sqm     = db.Column(db.Numeric(10, 2))     # Fläche m²
+    price_eur    = db.Column(db.Numeric(12, 2))     # Kaufpreis / Jahrespacht EUR
+    price_sqm    = db.Column(db.Numeric(10, 2))     # EUR/m² (auto or manual)
+    description  = db.Column(db.Text)
+    zone_type    = db.Column(db.String(100))        # Wohnbaufläche / WA / MI etc.
+    features     = db.Column(JSONB)                 # list of feature strings
+
+    # ── Contact ───────────────────────────────────────
+    provider_id      = db.Column(db.String(36), db.ForeignKey('providers.id'), nullable=True, index=True)
+    contact_name     = db.Column(db.String(255))
+    contact_email    = db.Column(db.String(255))
+    contact_phone    = db.Column(db.String(100))
+    contact_website  = db.Column(db.String(500))
+
+    # ── Source / meta ─────────────────────────────────
+    source               = db.Column(db.String(50), default='makler')  # makler | gemeinde | privat
+    source_url           = db.Column(db.String(1000))
+    submitted_by_user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)
+    is_verified          = db.Column(db.Boolean, default=False, nullable=False)
+    created_at           = db.Column(db.DateTime(timezone=True), default=now_utc, nullable=False)
+    updated_at           = db.Column(db.DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    # ── Relations ─────────────────────────────────────
+    gemeinde         = db.relationship('Gemeinde', backref=db.backref('parcels', lazy='dynamic'))
+    provider         = db.relationship('Provider', foreign_keys=[provider_id],
+                                       backref=db.backref('parcels', lazy='dynamic'))
+    submitted_by     = db.relationship('User', foreign_keys=[submitted_by_user_id],
+                                       backref=db.backref('submitted_parcels', lazy='dynamic'))
+
+    def to_dict(self):
+        from app.models.enums import PARCEL_TYPE_LABELS, PARCEL_TYPE_COLORS
+        return {
+            'id': self.id,
+            'title': self.title,
+            'parcel_type': self.parcel_type.value,
+            'parcel_type_label': PARCEL_TYPE_LABELS.get(self.parcel_type, self.parcel_type.value),
+            'color': PARCEL_TYPE_COLORS.get(self.parcel_type, '#ea580c'),
+            'status': self.status.value,
+            'lat': float(self.lat),
+            'lng': float(self.lng),
+            'address': self.address or '',
+            'plz': self.plz or '',
+            'city': self.city or '',
+            'area_sqm': float(self.area_sqm) if self.area_sqm else None,
+            'price_eur': float(self.price_eur) if self.price_eur else None,
+            'price_sqm': float(self.price_sqm) if self.price_sqm else None,
+            'description': self.description or '',
+            'zone_type': self.zone_type or '',
+            'features': self.features or [],
+            'contact_name': self.contact_name or (self.provider.company_name if self.provider else ''),
+            'contact_email': self.contact_email or (self.provider.contact_email if self.provider else ''),
+            'contact_phone': self.contact_phone or (self.provider.contact_phone if self.provider else ''),
+            'contact_website': self.contact_website or (self.provider.website if self.provider else ''),
+            'provider_id': self.provider_id,
+            'provider_url': f'/providers/{self.provider_id}' if self.provider_id else None,
+            'source': self.source or '',
+            'is_verified': self.is_verified,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'gemeinde_name': self.gemeinde.name if self.gemeinde else (self.city or ''),
+        }
