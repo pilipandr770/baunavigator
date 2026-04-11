@@ -13,8 +13,11 @@
   <button class="btn btn-secondary btn-sm tab-btn" id="tab-parcels" onclick="switchTab('parcels')">🏗 Grundstücke</button>
   <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
     <span style="font-size:11px;color:var(--text-m);font-weight:600;">Kartenlayer:</span>
-    <button class="btn btn-secondary btn-sm" id="btn-layer-alkis" onclick="toggleLayer('alkis')" title="ALKIS Liegenschaftskarte (HVBG)">📐 Flurstücke</button>
-    <button class="btn btn-secondary btn-sm" id="btn-layer-boris" onclick="toggleLayer('boris')" title="BORIS Bodenrichtwerte (HVBG)">💶 Bodenrichtwerte</button>
+    <button class="btn btn-secondary btn-sm" id="btn-layer-alkis" onclick="toggleLayer('alkis')" title="ALKIS Flurstücke einblenden — sichtbar ab Zoom 14">📐 Flurstücke</button>
+    <button class="btn btn-secondary btn-sm" onclick="openHvbgViewer('alkis')" title="Öffnet offizielle HVBG Liegenschaftskarte in neuem Tab">↗ HVBG</button>
+    <button class="btn btn-secondary btn-sm" id="btn-layer-boris" onclick="toggleLayer('boris')" title="BORIS Bodenrichtwerte einblenden — sichtbar ab Zoom 12">💶 Bodenrichtwerte</button>
+    <button class="btn btn-secondary btn-sm" onclick="openHvbgViewer('boris')" title="Öffnet BORIS Bodenrichtwerte-Viewer in neuem Tab">↗ BORIS</button>
+    <span id="layer-zoom-hint" style="display:none;font-size:11px;color:#b45309;background:#fef3c7;border-radius:4px;padding:2px 8px;margin-left:4px;"></span>
   </div>
 </div>
 
@@ -128,19 +131,29 @@ fetch('/map/api/gemeinden')
   .then(data => {
     const list = document.getElementById('gemeinde-list');
     data.forEach(g => {
+      const hasParcels = g.parcel_count > 0;
       const div = document.createElement('div');
-      div.style.cssText = 'padding:6px 8px;cursor:pointer;border-radius:4px;font-size:12px;';
-      div.textContent = `${g.name} (${g.landkreis || 'Hessen'})`;
+      div.style.cssText = 'padding:6px 8px;cursor:pointer;border-radius:4px;font-size:12px;display:flex;justify-content:space-between;align-items:center;';
+      div.innerHTML = `<span>${g.name} (${g.landkreis || 'Hessen'})</span>` +
+        (hasParcels ? `<span style="font-size:10px;background:#16a34a;color:#fff;border-radius:10px;padding:1px 7px;flex-shrink:0;">${g.parcel_count} Grundst.</span>` : '');
       div.addEventListener('mouseenter', () => div.style.background = 'var(--c-blue-l)');
       div.addEventListener('mouseleave', () => div.style.background = '');
       div.addEventListener('click', () => selectGemeinde(g));
       list.appendChild(div);
 
       if (g.lat && g.lng) {
+        // Color: green ring if has parcels, blue otherwise
+        const fillColor = hasParcels ? '#2563eb' : '#6b7280';
+        const ringColor = hasParcels ? '#16a34a' : '#fff';
+        const ringWeight = hasParcels ? 3 : 2;
+        const popup = hasParcels
+          ? `<b>${g.name}</b><br>${g.landkreis || ''}<br><span style="color:#16a34a;font-weight:600;">✓ ${g.parcel_count} Grundstück${g.parcel_count > 1 ? 'e' : ''} verfügbar</span><br><a href="/map/?tab=parcels&gemeinde_id=${g.id}" style="color:#2563eb;">Grundstücke ansehen →</a>`
+          : `<b>${g.name}</b><br>${g.landkreis || ''}<br><span style="color:#6b7280;font-size:11px;">Noch keine Inserate — <a href="/map/grundstueck/neu">Jetzt eintragen</a></span>`;
         const marker = L.circleMarker([g.lat, g.lng], {
-          radius: 7, fillColor: '#2563eb', color: '#fff',
-          weight: 2, opacity: 1, fillOpacity: 0.85
-        }).bindPopup(`<b>${g.name}</b><br>${g.landkreis || ''}`);
+          radius: hasParcels ? 9 : 7,
+          fillColor, color: ringColor,
+          weight: ringWeight, opacity: 1, fillOpacity: 0.85
+        }).bindPopup(popup);
         marker.on('click', () => selectGemeinde(g));
         marker.addTo(map);
         gemeindeMarkers.push(marker);
@@ -167,6 +180,7 @@ function selectGemeinde(g) {
   const bauamtEl = document.getElementById('bauamt-info');
   if (bauamtEl) {
     const lines = [];
+    if (g.parcel_count > 0) lines.push(`<div style="background:#dcfce7;border-radius:4px;padding:4px 8px;color:#16a34a;font-weight:600;font-size:11px;margin-bottom:6px;">✓ ${g.parcel_count} Grundstück${g.parcel_count > 1 ? 'e' : ''} verfügbar — <a href="/map/?tab=parcels" onclick="switchTab('parcels');return false;" style="color:#16a34a;">ansehen</a></div>`);
     if (g.bauamt_name)    lines.push(`<div style="font-weight:600;">${g.bauamt_name}</div>`);
     if (g.bauamt_address) lines.push(`<div style="color:var(--text-m);font-size:11px;">📍 ${g.bauamt_address}</div>`);
     if (g.bauamt_phone)   lines.push(`<a href="tel:${g.bauamt_phone}" style="color:var(--c-blue);font-size:12px;">📞 ${g.bauamt_phone}</a>`);
@@ -387,42 +401,94 @@ function closeParcelDetail() {
   document.getElementById('parcel-detail').style.display = 'none';
 }
 
-// ── HVBG WMS Layer Controls ────────────────────────────────────────────────
-// ALKIS Liegenschaftskarte — HVBG Open Data WMS (free since 2022)
-const alkisLayer = L.tileLayer.wms(
-  'https://www.geoportal.hessen.de/mapbender/php/wms.php?inspire=1&isobjid=2613&',
-  {
-    layers: 'Liegenschaftskarte_grau',
-    format: 'image/png',
-    transparent: true,
-    opacity: 0.6,
-    attribution: '© HVBG Hessen — Liegenschaftskataster Open Data',
+// ── HVBG WFS Layers (proxied via /map/api/wfs/*) ──────────────────────────
+// Vector data — fetched on demand for the visible bbox, zoom ≥ 14 (ALKIS) / ≥ 12 (BORIS)
+const alkisGeoJSON = L.geoJSON(null, {
+  style: { color: '#b45309', weight: 1, fillColor: '#fde68a', fillOpacity: 0.35 },
+  onEachFeature(feature, layer) {
+    const p = feature.properties || {};
+    const label = p.nationalCadastralReference || p.label || p.inspireId || '';
+    layer.bindPopup(`<b>Flurstück</b>${label ? '<br>' + label : ''}`);
   }
-);
-// BORIS Bodenrichtwerte — HVBG Open Data WMS
-const borisLayer = L.tileLayer.wms(
-  'https://www.geoportal.hessen.de/mapbender/php/wms.php?inspire=1&isobjid=8243&',
-  {
-    layers: 'Bodenrichtwerte',
-    format: 'image/png',
-    transparent: true,
-    opacity: 0.5,
-    attribution: '© HVBG Hessen — BORIS Bodenrichtwerte Open Data',
+});
+const borisGeoJSON = L.geoJSON(null, {
+  style: { color: '#0369a1', weight: 1.5, fillColor: '#bfdbfe', fillOpacity: 0.4 },
+  onEachFeature(feature, layer) {
+    const p = feature.properties || {};
+    const brw = p.BRW || p.bodenrichtwert || p.value || '';
+    layer.bindPopup(`<b>Bodenrichtwert</b>${brw ? '<br>€ ' + brw + ' /m²' : ''}`);
   }
-);
+});
 
 const activeLayers = { alkis: false, boris: false };
+let wfsAbort = { alkis: null, boris: null };
+
+async function loadWfsLayer(name) {
+  if (!activeLayers[name]) return;
+  const zoom = map.getZoom();
+  const minZ = name === 'alkis' ? 14 : 12;
+  const layerGeoJSON = name === 'alkis' ? alkisGeoJSON : borisGeoJSON;
+  const hintEl = document.getElementById('layer-zoom-hint');
+
+  if (zoom < minZ) {
+    layerGeoJSON.clearLayers();
+    if (hintEl) {
+      hintEl.textContent = `Bitte auf Zoom-Stufe ${minZ}+ zoomen, um ${name === 'alkis' ? 'Flurstücke' : 'Bodenrichtwerte'} zu sehen.`;
+      hintEl.style.display = 'block';
+      clearTimeout(hintEl._t);
+      hintEl._t = setTimeout(() => hintEl.style.display = 'none', 4000);
+    }
+    return;
+  }
+
+  const b = map.getBounds();
+  const bbox = `${b.getSouth().toFixed(6)},${b.getWest().toFixed(6)},${b.getNorth().toFixed(6)},${b.getEast().toFixed(6)}`;
+  const btn = document.getElementById(`btn-layer-${name}`);
+  if (btn) btn.textContent = btn.textContent.replace(/^[^📐💶]*/, '') + ' ⏳';
+
+  try {
+    const resp = await fetch(`/map/api/wfs/${name}?bbox=${bbox}`);
+    const data = await resp.json();
+    layerGeoJSON.clearLayers();
+    if (data._hint === 'zoom_in') {
+      if (hintEl) { hintEl.textContent = `Noch mehr zoomen, um ${name === 'alkis' ? 'Flurstücke' : 'Bodenrichtwerte'} zu laden.`; hintEl.style.display = 'block'; clearTimeout(hintEl._t); hintEl._t = setTimeout(() => hintEl.style.display = 'none', 3000); }
+    } else if (data.features) {
+      layerGeoJSON.addData(data);
+    }
+  } catch(e) {
+    console.warn('[WFS]', name, e);
+  } finally {
+    if (btn) btn.textContent = btn.textContent.replace(' ⏳', '');
+  }
+}
+
+map.on('moveend zoomend', () => {
+  if (activeLayers.alkis) loadWfsLayer('alkis');
+  if (activeLayers.boris) loadWfsLayer('boris');
+});
 
 function toggleLayer(name) {
-  const layer = name === 'alkis' ? alkisLayer : borisLayer;
+  const layerGeoJSON = name === 'alkis' ? alkisGeoJSON : borisGeoJSON;
   const btn = document.getElementById(`btn-layer-${name}`);
   activeLayers[name] = !activeLayers[name];
   if (activeLayers[name]) {
-    layer.addTo(map);
+    layerGeoJSON.addTo(map);
     btn.className = 'btn btn-primary btn-sm';
+    loadWfsLayer(name);
   } else {
-    map.removeLayer(layer);
+    map.removeLayer(layerGeoJSON);
+    layerGeoJSON.clearLayers();
     btn.className = 'btn btn-secondary btn-sm';
+  }
+}
+
+function openHvbgViewer(service) {
+  const c = map.getCenter();
+  const z = map.getZoom();
+  if (service === 'alkis') {
+    window.open(`https://www.geoportal.hessen.de/mapbender/frames/index.php?wmc_id=2139&center=${c.lng},${c.lat}&scale=${Math.round(559082264 / Math.pow(2, z))}`, '_blank', 'noopener');
+  } else {
+    window.open(`https://www.boris.hessen.de/B21_BRW/fachdaten?lat=${c.lat}&lon=${c.lng}&zoom=${z}`, '_blank', 'noopener');
   }
 }
 </script>

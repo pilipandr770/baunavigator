@@ -5,66 +5,150 @@
 const AiChat = {
   projectId: null,
   stageKey: null,
+  browserEnabled: true,
+  attachedFile: null,
 
   init(projectId, stageKey) {
     this.projectId = projectId;
     this.stageKey = stageKey;
-    const form = document.getElementById('ai-chat-form');
-    if (form) {
-      form.addEventListener('submit', (e) => {
+
+    // Textarea: Enter sends, Shift+Enter = newline
+    const textarea = document.getElementById('ai-input');
+    if (textarea) {
+      textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.send();
+        }
+      });
+    }
+
+    // File input
+    const fileInput = document.getElementById('chat-file-input');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        this.attachedFile = file;
+        const bar = document.getElementById('chat-attach-bar');
+        const nameEl = document.getElementById('chat-attach-name');
+        if (bar) bar.style.display = 'flex';
+        if (nameEl) nameEl.textContent = file.name + ' (' + (file.size > 1024 ? Math.round(file.size/1024) + ' KB' : file.size + ' B') + ')';
+        // Reset so same file can be re-selected
+        fileInput.value = '';
+      });
+    }
+
+    // Drag-drop on chat body
+    const body = document.getElementById('ai-chat-body');
+    if (body) {
+      body.addEventListener('dragover', (e) => { e.preventDefault(); body.classList.add('drag-over'); });
+      body.addEventListener('dragleave', () => body.classList.remove('drag-over'));
+      body.addEventListener('drop', (e) => {
         e.preventDefault();
-        this.send();
+        body.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        this.attachedFile = file;
+        const bar = document.getElementById('chat-attach-bar');
+        const nameEl = document.getElementById('chat-attach-name');
+        if (bar) bar.style.display = 'flex';
+        if (nameEl) nameEl.textContent = file.name;
       });
     }
   },
 
   async send() {
-    const input = document.getElementById('ai-input');
-    const message = (input?.value || '').trim();
-    if (!message) return;
+    const textarea = document.getElementById('ai-input');
+    const message = (textarea?.value || '').trim();
+    const file = this.attachedFile;
 
-    this.addMessage(message, 'user');
-    input.value = '';
-    this.addMessage('...', 'bot', 'loading');
+    if (!message && !file) return;
+
+    // Show user message (with file indicator if attached)
+    let userText = message || '(Datei hochgeladen)';
+    if (file && message) userText = message;
+    const userMsgEl = this.addMessage(userText, 'user');
+    if (file && userMsgEl) {
+      const chip = document.createElement('div');
+      chip.style.cssText = 'font-size:11px;margin-top:4px;color:rgba(255,255,255,.8);';
+      chip.textContent = '📎 ' + file.name;
+      userMsgEl.appendChild(chip);
+    }
+
+    if (textarea) textarea.value = '';
+    this.clearFile();
+    this.addMessage('…', 'bot', 'loading');
 
     try {
-      const resp = await fetch('/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCsrfToken(),
-        },
-        body: JSON.stringify({
-          message,
-          project_id: this.projectId,
-          stage_key: this.stageKey,
-        }),
-      });
+      let resp;
+      if (file) {
+        const fd = new FormData();
+        fd.append('message', message || '');
+        fd.append('project_id', this.projectId);
+        fd.append('stage_key', this.stageKey);
+        fd.append('use_browser', this.browserEnabled ? 'true' : 'false');
+        fd.append('file', file);
+        resp = await fetch('/ai/chat', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': getCsrfToken() },
+          body: fd,
+        });
+      } else {
+        resp = await fetch('/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+          body: JSON.stringify({
+            message,
+            project_id: this.projectId,
+            stage_key: this.stageKey,
+            use_browser: this.browserEnabled,
+          }),
+        });
+      }
+
       const data = await resp.json();
       this.removeLoading();
 
       if (data.success) {
-        const modeClass = data.mode === 'confirmation_required' ? 'mode-confirm'
-          : data.mode === 'human_required' ? 'mode-human' : '';
-        this.addMessage(data.response, 'bot', modeClass);
+        const botEl = this.addMessage(data.response, 'bot');
+        // Show agent + tool badges inside the message
+        if (botEl && (data.agent_name || (data.tool_calls && data.tool_calls.length))) {
+          const meta = document.createElement('div');
+          meta.style.cssText = 'margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;';
+          if (data.agent_name) {
+            const agentIcons = { LandAgent:'🏗', PermitAgent:'📋', ConstructionAgent:'🔨', FinishingAgent:'🪟', GeneralAgent:'🤖' };
+            const ab = document.createElement('span');
+            ab.style.cssText = 'font-size:10px;background:var(--c-blue-l);color:var(--c-blue);border-radius:10px;padding:1px 8px;';
+            ab.textContent = (agentIcons[data.agent_name] || '🤖') + ' ' + data.agent_name;
+            meta.appendChild(ab);
+          }
+          if (data.tool_calls && data.tool_calls.length) {
+            const tb = document.createElement('span');
+            tb.style.cssText = 'font-size:10px;background:#e0f2fe;color:#0369a1;border-radius:10px;padding:1px 8px;';
+            tb.textContent = '🔍 ' + data.tool_calls.length + ' Suche(n)';
+            meta.appendChild(tb);
+          }
+          botEl.appendChild(meta);
+        }
       } else {
-        this.addMessage('Fehler: ' + data.response, 'bot', 'error');
+        this.addMessage('Fehler: ' + (data.response || 'Unbekannter Fehler'), 'bot', 'error');
       }
     } catch (err) {
       this.removeLoading();
-      this.addMessage('Verbindungsfehler. Bitte versuche es erneut.', 'bot', 'error');
+      this.addMessage('Verbindungsfehler. Bitte versuchen Sie es erneut.', 'bot', 'error');
     }
   },
 
   addMessage(text, type, extra) {
     const body = document.getElementById('ai-chat-body');
-    if (!body) return;
+    if (!body) return null;
 
     const div = document.createElement('div');
-    div.className = `ai-msg ai-msg-${type} ${extra || ''}`;
+    div.className = `ai-msg ai-msg-${type}${extra ? ' ' + extra : ''}`;
 
-    // Парсим markdown-подобный текст
     div.innerHTML = text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/\n/g, '<br>')
@@ -76,8 +160,23 @@ const AiChat = {
   },
 
   removeLoading() {
-    const loading = document.querySelector('.loading');
+    const loading = document.querySelector('.ai-chat-body .loading');
     if (loading) loading.remove();
+  },
+
+  toggleBrowser() {
+    this.browserEnabled = !this.browserEnabled;
+    const btn = document.getElementById('btn-browser');
+    if (btn) {
+      btn.classList.toggle('chat-tool-active', this.browserEnabled);
+      btn.title = this.browserEnabled ? 'Websuche deaktivieren' : 'Websuche aktivieren';
+    }
+  },
+
+  clearFile() {
+    this.attachedFile = null;
+    const bar = document.getElementById('chat-attach-bar');
+    if (bar) bar.style.display = 'none';
   },
 };
 
@@ -116,7 +215,7 @@ async function requestAiAction(action, projectId, stageKey) {
     const data = await resp.json();
 
     if (data.success) {
-      showResult(data.response, data.mode);
+      showResult(data.response, data.mode, data.tool_calls, data.agent_name);
       if (data.outbox_id) {
         showToast('Entwurf in Postausgang gespeichert', 'success');
       }
@@ -135,7 +234,7 @@ async function requestAiAction(action, projectId, stageKey) {
   }
 }
 
-function showResult(text, mode) {
+function showResult(text, mode, toolCalls, agentName) {
   let panel = document.getElementById('ai-result-panel');
   if (!panel) {
     panel = document.createElement('div');
@@ -149,12 +248,32 @@ function showResult(text, mode) {
     : mode === 'confirmation_required' ? '⟳ Entwurf — bitte prüfen und bestätigen'
     : '! Fachmann erforderlich';
 
+  const agentIcons = { LandAgent: '🏗', PermitAgent: '📋', ConstructionAgent: '🔨', FinishingAgent: '🪟', GeneralAgent: '🤖' };
+  const agentLabel = agentName ? `<span style="font-size:10px;background:var(--c-blue-l);color:var(--c-blue);border-radius:10px;padding:1px 8px;margin-left:8px;">${agentIcons[agentName] || '🤖'} ${agentName}</span>` : '';
+
+  // Build tool-calls trace badge
+  let toolBadge = '';
+  if (toolCalls && toolCalls.length > 0) {
+    const toolNames = { web_search: '🔍', fetch_page: '🌐' };
+    const items = toolCalls.map(t => {
+      const icon = toolNames[t.tool] || '🔧';
+      const label = t.tool === 'web_search'
+        ? escapeHtml(t.input.query || '')
+        : escapeHtml((t.input.url || '').replace(/^https?:\/\//, '').slice(0, 60));
+      return `<span style="opacity:.85;">${icon} ${label}</span>`;
+    }).join(' · ');
+    toolBadge = `<div style="margin-bottom:10px;font-size:11px;color:#0369a1;background:#e0f2fe;border-radius:4px;padding:4px 10px;border-left:3px solid #0369a1;">
+      🤖 Agent hat ${toolCalls.length} Suche(n) durchgeführt: ${items}
+    </div>`;
+  }
+
   panel.innerHTML = `
-    <div class="card-header">
+    <div class="card-header" style="display:flex;align-items:center;gap:6px;">
       <div class="badge ${mode === 'autonomous' ? 'badge-done' : mode === 'human_required' ? 'badge-draft' : 'badge-active'}">
         ${modeLabel}
-      </div>
+      </div>${agentLabel}
     </div>
+    ${toolBadge}
     <div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${escapeHtml(text)}</div>
     <div style="margin-top:12px;padding:8px 12px;background:var(--c-gray-l);border-radius:6px;font-size:11px;color:var(--text-m);border-left:3px solid var(--c-yellow,#f59e0b);">
       ⚠️ <strong>Rechtlicher Hinweis:</strong> Diese KI-Auskunft ersetzt keine Rechts-, Steuer- oder Fachberatung. 

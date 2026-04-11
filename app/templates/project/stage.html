@@ -53,6 +53,30 @@
     </div>
     {% endif %}
 
+    {% if stage.stage_key.value == 'land_search' %}
+    <!-- ── Grundstückskarte (nur im Schritt Grundstücksuche) ─────────────── -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="card-header flex items-center gap-8" style="padding:10px 14px;">
+        <div class="card-title">🗺 Grundstückskarte — Hessen</div>
+        <a href="{{ url_for('map.index') }}?tab=parcels{% if project.gemeinde %}&gemeinde_id={{ project.gemeinde_id }}{% endif %}"
+           class="btn btn-secondary btn-sm ml-auto" style="font-size:11px;">Vollbild ↗</a>
+        <a href="{{ url_for('map.parcel_new') }}" class="btn btn-primary btn-sm" style="font-size:11px;">+ Grundstück eintragen</a>
+      </div>
+      <!-- Map container -->
+      <div id="stage-map" style="height:380px;width:100%;"></div>
+      <!-- Parcel mini-list -->
+      <div id="stage-parcel-list" style="max-height:180px;overflow-y:auto;border-top:1px solid var(--border);font-size:12px;"></div>
+      <div style="padding:6px 12px;font-size:10px;color:var(--text-m);display:flex;gap:12px;flex-wrap:wrap;border-top:1px solid var(--border);">
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#2563eb;display:inline-block;"></span>Gemeinde</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block;border:2px solid #16a34a;"></span>Mit Grundstücken</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#f97316;display:inline-block;"></span>Kauf</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#8b5cf6;display:inline-block;"></span>Miete/Pacht</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#0891b2;display:inline-block;"></span>Erbbaurecht</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Gemeindlich</span>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Documents -->
     <div class="card">
       <div class="card-header flex items-center gap-8">
@@ -387,5 +411,83 @@ async function toggleChecklist(projectId, stageKey, index, done) {
     showToast('Fehler beim Speichern', 'danger');
   }
 }
+
+// ── LAND_SEARCH Mini-Map ───────────────────────────────────────────────────
+{% if stage.stage_key.value == 'land_search' %}
+(function () {
+  {% if project.gemeinde and project.gemeinde.lat and project.gemeinde.lng %}
+  const CENTER = [{{ project.gemeinde.lat }}, {{ project.gemeinde.lng }}];
+  const ZOOM   = 11;
+  {% else %}
+  const CENTER = [50.65, 9.0];
+  const ZOOM   = 8;
+  {% endif %}
+  {% if project.gemeinde_id %}
+  const PROJECT_GEMEINDE_ID = {{ project.gemeinde_id }};
+  {% else %}
+  const PROJECT_GEMEINDE_ID = null;
+  {% endif %}
+
+  const PARCEL_COLORS = { kauf: '#f97316', miete: '#8b5cf6', erbbaurecht: '#0891b2', gemeinde: '#16a34a' };
+  const PARCEL_LABELS = { kauf: 'Kauf', miete: 'Miete/Pacht', erbbaurecht: 'Erbbaurecht', gemeinde: 'Gemeindlich' };
+
+  const stageMap = initMap('stage-map', { center: CENTER, zoom: ZOOM });
+
+  // Load Gemeinden markers
+  fetch('/map/api/gemeinden')
+    .then(r => r.json())
+    .then(data => {
+      data.forEach(g => {
+        if (!g.lat || !g.lng) return;
+        const hasParcels = g.parcel_count > 0;
+        const isProject  = g.id === PROJECT_GEMEINDE_ID;
+        L.circleMarker([g.lat, g.lng], {
+          radius:      isProject ? 11 : (hasParcels ? 9 : 6),
+          fillColor:   isProject ? '#1d4ed8' : (hasParcels ? '#2563eb' : '#9ca3af'),
+          color:       isProject ? '#fde047' : (hasParcels ? '#16a34a' : '#fff'),
+          weight:      isProject ? 3 : 2,
+          opacity: 1, fillOpacity: isProject ? 1 : (hasParcels ? 0.85 : 0.5)
+        }).bindPopup(
+          `<b>${g.name}</b>${isProject ? ' ⭐' : ''}<br>${g.landkreis || ''}`
+          + (hasParcels ? `<br><span style="color:#16a34a;">✓ ${g.parcel_count} Grundstück${g.parcel_count > 1 ? 'e' : ''}</span>` : '')
+        ).addTo(stageMap);
+      });
+    });
+
+  // Load parcel markers
+  const parcelListEl = document.getElementById('stage-parcel-list');
+  fetch('/map/api/parcels')
+    .then(r => r.json())
+    .then(parcels => {
+      if (!parcels.length) {
+        parcelListEl.innerHTML = '<div style="padding:10px 14px;color:var(--text-m);">Noch keine Grundstücke eingetragen — <a href="/map/grundstueck/neu">Jetzt eintragen</a></div>';
+        return;
+      }
+      parcels.forEach(p => {
+        if (!p.lat || !p.lng) return;
+        const color = PARCEL_COLORS[p.parcel_type] || '#6b7280';
+        L.circleMarker([p.lat, p.lng], {
+          radius: 9, fillColor: color, color: '#fff',
+          weight: 2, opacity: 1, fillOpacity: 0.9
+        }).bindPopup(
+          `<b>${p.title}</b><br>${PARCEL_LABELS[p.parcel_type] || p.parcel_type}`
+          + (p.area_sqm ? `<br>${p.area_sqm} m²` : '')
+          + (p.price_eur ? `<br>€ ${Number(p.price_eur).toLocaleString('de-DE')}` : '')
+          + `<br><a href="/map/?tab=parcels">Auf Karte →</a>`
+        ).addTo(stageMap);
+
+        // Mini-list entry
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:6px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;cursor:pointer;';
+        row.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>`
+          + `<span style="flex:1;">${p.title || p.address || 'Grundstück'}</span>`
+          + (p.area_sqm ? `<span style="color:var(--text-m);">${p.area_sqm} m²</span>` : '')
+          + (p.price_eur ? `<span style="color:#16a34a;font-weight:600;">€ ${Number(p.price_eur).toLocaleString('de-DE')}</span>` : '');
+        row.addEventListener('click', () => stageMap.setView([p.lat, p.lng], 15));
+        parcelListEl.appendChild(row);
+      });
+    });
+})();
+{% endif %}
 </script>
 {% endblock %}

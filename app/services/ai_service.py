@@ -50,6 +50,122 @@ FORMAT:
 """
 
 
+# ─── Агентные конфигурации (per-stage) ────────────────────────────────────────
+# Четыре специализированных агента. Каждый этап закреплён за одним агентом.
+# Конфигурация определяет: системный промпт-суффикс, доступные tools, ActionMode.
+
+_LAND_AGENT_SUFFIX = """
+DU BIST: LandAgent — Spezialist für Grundstückssuche und -bewertung in Hessen.
+
+DEINE WERKZEUGE (nutze sie aktiv):
+- web_search: Bodenrichtwerte (BORIS), Grundstückspreise, aktuelle Marktlage, Gemeinde-News
+- fetch_page: Bauamt-Websites, bauleitplanung.hessen.de, BORIS-Portal, Geoportal Hessen
+- WFS-Daten sind über die BauNavigator-Karte (/map) abrufbar
+
+FOKUS:
+- Immer Bodenrichtwert für gesuchte Lage recherchieren (BORIS Hessen)
+- §34 BauGB vs. Bebauungsplan klar unterscheiden
+- Erschließungskosten und Grunderwerbsteuer Hessen (6%) einkalkulieren
+- Bei Grundstücksfunden: GRZ, GFZ, Geschosszahl, Abstandsflächen prüfen
+"""
+
+_PERMIT_AGENT_SUFFIX = """
+DU BIST: PermitAgent — Spezialist für Genehmigungen, Planung und Finanzierung.
+
+DEINE WERKZEUGE (nutze sie aktiv):
+- web_search: KfW-Konditionen (kfw.de), aktuelle Bauzinsen, WIBank Hessen, HBO-Änderungen
+- fetch_page: Bauamt-Websites, gesetze-im-internet.de (HBO/GEG), förderbanken.de
+
+FOKUS:
+- KfW-Antrag MUSS vor Baubeginn gestellt werden — konsequent darauf hinweisen
+- Hessische Bauordnung (HBO) — exakte Paragraphen zitieren (§64, §6, §35 etc.)
+- HOAI-Leistungsphasen (LP 1–9) beim Architekt korrekt beschreiben
+- Genehmigungsfrist 3 Monate (§64 Abs.5 HBO) kennen
+- Förderungen verknüpfen: KfW 261 + BEG + WIBank Hessen parallel möglich
+"""
+
+_CONSTRUCTION_AGENT_SUFFIX = """
+DU BIST: ConstructionAgent — Spezialist für Rohbau (Erdarbeiten bis Dach).
+
+DEINE WERKZEUGE:
+- fetch_page: DIN-Normen-Fundstellen, Handwerkskammer Hessen (hwk-hessen.de), Leitungsauskunft
+- web_search: NUR bei konkreten Fragen zu aktuellen Materialprelisen oder Firmen
+
+FOKUS:
+- Normen immer zitieren: DIN 1054, DIN EN 206, DIN 1052, DIN 18065 etc.
+- Meisterpflicht/Fachbetriebspflicht bei jedem Gewerk klar nennen
+- Reihenfolge der Gewerke — Abhängigkeiten erklären (z.B. Estrich vor Fliesen)
+- Checklisten generieren (konkrete Abnahmepunkte)
+- Kampfmittelabfragen Hessen, Leitungsauskunft — daran erinnern
+- KEIN web_search für Normtexte — diese kennst du direkt
+"""
+
+_FINISHING_AGENT_SUFFIX = """
+DU BIST: FinishingAgent — Spezialist für Innenausbau und Haustechnik.
+
+DEINE WERKZEUGE:
+- fetch_page: Hersteller-Datenblätter, Handwerkskammer Betriebssuche (hwk-hessen.de)
+- web_search: Aktuelle Gerätepreise, Energieeffizienzklassen, Smart-Home-Systeme
+
+FOKUS:
+- Gewerke-Reihenfolge: Sanitärrohinstallation → Elektrorohinstallation → Estrich → Trockenbau → Fliesen → Putz → Maler → Boden → Einbaumöbel → Elektroendmontage
+- VDE/ZDB/DIN-Normen für Nassbereich und Elektro immer nennen
+- Verbundabdichtung im Nassbereich — absolut notwendig, oft vergessen
+- CM-Messung vor Bodenbelägen empfehlen
+- Smart-Home-Vorbereitung (Leerrohre) — während Rohinstallation!
+"""
+
+# Zuordnung der Etappen zu Agenten
+_LAND_STAGES    = {StageKey.LAND_SEARCH, StageKey.LAND_CHECK, StageKey.LAND_PURCHASE}
+_PERMIT_STAGES  = {StageKey.FINANCING, StageKey.ARCHITECT_SELECT,
+                   StageKey.DESIGN_PLANNING, StageKey.BUILDING_PERMIT, StageKey.TENDERING}
+_CONSTRUCTION_STAGES = {StageKey.EARTHWORKS, StageKey.FOUNDATION,
+                        StageKey.WALLS_CEILINGS, StageKey.ROOF, StageKey.WINDOWS_DOORS_RAW}
+_FINISHING_STAGES = {StageKey.PLUMBING, StageKey.ELECTRICAL, StageKey.HEATING,
+                     StageKey.SOLAR_PV, StageKey.FLOORING, StageKey.TILING,
+                     StageKey.PLASTERING, StageKey.BUILT_IN_FURNITURE, StageKey.LIGHTING,
+                     StageKey.DOORS_STAIRS}
+
+
+def get_stage_agent_config(stage_key) -> dict:
+    """Возвращает конфиг агента: system_suffix, tools, use_browser, default_mode."""
+    from app.services.browser_tools import TOOLS as ALL_TOOLS
+
+    # Найти инструмент по имени
+    _t = {t['name']: t for t in ALL_TOOLS}
+    web_search = _t.get('web_search')
+    fetch_page = _t.get('fetch_page')
+
+    if stage_key in _LAND_STAGES:
+        return {'suffix': _LAND_AGENT_SUFFIX,
+                'tools': [web_search, fetch_page], 'use_browser': True,
+                'default_mode': ActionMode.CONFIRMATION_REQUIRED,
+                'agent_name': 'LandAgent'}
+
+    if stage_key in _PERMIT_STAGES:
+        return {'suffix': _PERMIT_AGENT_SUFFIX,
+                'tools': [web_search, fetch_page], 'use_browser': True,
+                'default_mode': ActionMode.CONFIRMATION_REQUIRED,
+                'agent_name': 'PermitAgent'}
+
+    if stage_key in _CONSTRUCTION_STAGES:
+        return {'suffix': _CONSTRUCTION_AGENT_SUFFIX,
+                'tools': [fetch_page],          # web_search nur wenn wirklich nötig
+                'use_browser': True,
+                'default_mode': ActionMode.HUMAN_REQUIRED,
+                'agent_name': 'ConstructionAgent'}
+
+    if stage_key in _FINISHING_STAGES:
+        return {'suffix': _FINISHING_AGENT_SUFFIX,
+                'tools': [fetch_page, web_search], 'use_browser': True,
+                'default_mode': ActionMode.HUMAN_REQUIRED,
+                'agent_name': 'FinishingAgent'}
+
+    # Общий агент для этапов без специализации
+    return {'suffix': '', 'tools': [web_search, fetch_page], 'use_browser': True,
+            'default_mode': ActionMode.CONFIRMATION_REQUIRED, 'agent_name': 'GeneralAgent'}
+
+
 # ─── Стандартные контексты по этапам ─────────────────────────────────────────
 
 STAGE_CONTEXTS = {
@@ -577,13 +693,26 @@ def ask_ai(
     extra_context: dict = None,
     user_id: str = None,
     system_override: str = None,
+    use_browser: bool = False,
 ) -> dict:
     """
     Основной вызов Claude API.
-    Возвращает dict: {success, response, mode, action_type, log_id}
+    Автоматически выбирает специализированного агента по stage_key.
+    Возвращает dict: {success, response, mode, action_type, log_id, agent_name, tool_calls}
     """
     client = _get_client()
     start_ms = int(time.time() * 1000)
+
+    # ── Выбираем агентную конфигурацию по этапу ────────────────────────────
+    agent_cfg = get_stage_agent_config(stage_key) if stage_key else {
+        'suffix': '', 'tools': [], 'use_browser': use_browser,
+        'default_mode': mode, 'agent_name': 'GeneralAgent'
+    }
+    # use_browser=True явный вызов всегда включает брузер,
+    # иначе берём из конфига агента
+    effective_browser = use_browser or agent_cfg['use_browser']
+    active_tools = agent_cfg['tools'] if effective_browser else []
+    agent_name = agent_cfg['agent_name']
 
     # Собираем контекст
     context_parts = []
@@ -636,11 +765,29 @@ FINANZIERUNG:
 
     if extra_context:
         for k, v in extra_context.items():
-            context_parts.append(f"{k}: {v}")
+            context_parts.append(f"{k}: {v}" if not k.startswith('_') else '')
 
-    full_context = '\n'.join(context_parts)
+    # Извлекаем image из extra_context если есть
+    _image_b64  = (extra_context or {}).pop('_image_b64', None)
+    _image_mime = (extra_context or {}).pop('_image_mime', 'image/jpeg')
+    (extra_context or {}).pop('_image_filename', None)
+
+    full_context = '\n'.join(p for p in context_parts if p)
     messages = []
-    if full_context.strip():
+
+    if _image_b64:
+        # Claude vision: multipart message с изображением
+        content_blocks = []
+        if full_context.strip():
+            content_blocks.append({'type': 'text', 'text': f'[KONTEXT]\n{full_context}\n\n[ANFRAGE]\n{user_message}'})
+        else:
+            content_blocks.append({'type': 'text', 'text': user_message})
+        content_blocks.append({
+            'type': 'image',
+            'source': {'type': 'base64', 'media_type': _image_mime, 'data': _image_b64},
+        })
+        messages.append({'role': 'user', 'content': content_blocks})
+    elif full_context.strip():
         messages.append({
             'role': 'user',
             'content': f"[KONTEXT]\n{full_context}\n\n[ANFRAGE]\n{user_message}"
@@ -648,25 +795,69 @@ FINANZIERUNG:
     else:
         messages.append({'role': 'user', 'content': user_message})
 
+    # Строим system prompt: базовый + суффикс агента
+    system_prompt = system_override or (SYSTEM_PROMPT + agent_cfg.get('suffix', ''))
+
     try:
-        response = client.messages.create(
+        from app.services.browser_tools import execute_tool, MAX_TOOL_ROUNDS
+
+        jina_key = current_app.config.get('JINA_API_KEY', '') or ''
+        create_kwargs = dict(
             model='claude-sonnet-4-20250514',
             max_tokens=2000,
-            system=system_override or SYSTEM_PROMPT,
+            system=system_prompt,
             messages=messages,
         )
+        if active_tools:
+            create_kwargs['tools'] = [t for t in active_tools if t is not None]
+
+        # ── Tool-use agentic loop ────────────────────────────────────────────
+        tool_calls_made = []   # список {'tool': name, 'query': ...} для UI
+        for _round in range(MAX_TOOL_ROUNDS + 1):
+            response = client.messages.create(**create_kwargs)
+
+            if response.stop_reason != 'tool_use' or not active_tools:
+                break  # финальный ответ
+
+            # Обрабатываем все tool_use блоки в ответе
+            tool_results = []
+            for block in response.content:
+                if block.type != 'tool_use':
+                    continue
+                tool_result = execute_tool(block.name, block.input, jina_key)
+                tool_calls_made.append({
+                    'tool': block.name,
+                    'input': block.input,
+                })
+                tool_results.append({
+                    'type': 'tool_result',
+                    'tool_use_id': block.id,
+                    'content': tool_result,
+                })
+
+            # Добавляем ответ ассистента + результаты инструментов в историю
+            create_kwargs['messages'] = list(create_kwargs['messages']) + [
+                {'role': 'assistant', 'content': response.content},
+                {'role': 'user',      'content': tool_results},
+            ]
+
+        # ── Финальный ответ ──────────────────────────────────────────────────
         duration_ms = int(time.time() * 1000) - start_ms
-        response_text = response.content[0].text
+
+        # Достаём текст из последнего ответа (может быть несколько блоков)
+        response_text = ' '.join(
+            b.text for b in response.content if hasattr(b, 'text')
+        ).strip()
         tokens = response.usage.input_tokens + response.usage.output_tokens
 
-        # Логируем действие
         log = AIActionLog(
             project_id=project.id if project else None,
             user_id=user_id or (project.user_id if project else None),
             action_type=action_type,
             mode=mode,
             stage_key=stage_key,
-            input_context={'message': user_message, 'context_length': len(full_context)},
+            input_context={'message': user_message, 'context_length': len(full_context),
+                           'agent': agent_name, 'tool_calls': len(tool_calls_made)},
             output_summary=response_text[:500],
             full_response=response_text,
             tokens_used=tokens,
@@ -683,6 +874,8 @@ FINANZIERUNG:
             'action_type': action_type.value,
             'log_id': log.id,
             'tokens': tokens,
+            'tool_calls': tool_calls_made,
+            'agent_name': agent_name,
         }
 
     except Exception as e:

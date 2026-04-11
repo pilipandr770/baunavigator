@@ -46,236 +46,234 @@
   </div>
 </div>
 
-<div class="grid-2" style="grid-template-columns: 2fr 1fr; gap: 20px;">
+<!-- Project Workspace: collapsible sidebar + main chat panel -->
+<div class="project-workspace" id="project-workspace">
 
-  <!-- Left: Stages -->
-  <div>
-    {% for phase in phases %}
-    <div class="phase-block">
-      <div class="phase-header" style="background: var(--c-{{ phase.color }}-l, var(--c-gray-l));">
-        <div class="phase-dot" style="background: var(--c-{{ phase.color }}, var(--c-gray));"></div>
-        <div class="phase-title">{{ phase.key }} — {{ phase.label }}</div>
-        <div class="phase-count text-muted">
-          {% set done = namespace(n=0) %}
-          {% for s in phase.stages %}{% if s.stage and s.stage.status.value == 'done' %}{% set done.n = done.n + 1 %}{% endif %}{% endfor %}
-          {{ done.n }}/{{ phase.stages|length }}
-        </div>
-      </div>
+  <!-- ── Collapsible Stages Sidebar ─────────────────────────── -->
+  <div class="stages-sidebar" id="stages-sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-label">Phasen</span>
+      <button class="sidebar-toggle-btn" id="sidebar-toggle" onclick="toggleSidebar()"
+              title="Seitenleiste ausblenden">◀</button>
+    </div>
 
-      {% for s in phase.stages %}
-      {% set st = s.stage %}
-      {% set status = st.status.value if st else 'pending' %}
-      <div class="stage-row status-{{ status }}">
-        <div class="stage-status">
-          {% if status == 'done' %}✓{% elif status == 'active' %}→{% else %}○{% endif %}
+    <div id="sidebar-content">
+      {% for phase in phases %}
+      <div class="phase-block">
+        <div class="phase-header phase-header-collapsible"
+             style="background: var(--c-{{ phase.color }}-l, var(--c-gray-l));"
+             onclick="togglePhase('ph-{{ loop.index }}')">
+          <div class="phase-dot" style="background: var(--c-{{ phase.color }}, var(--c-gray));"></div>
+          <div class="phase-title">{{ phase.label }}</div>
+          <div class="phase-count text-muted" style="display:flex;align-items:center;gap:4px;">
+            {% set done = namespace(n=0) %}
+            {% for s in phase.stages %}{% if s.stage and s.stage.status.value == 'done' %}{% set done.n = done.n + 1 %}{% endif %}{% endfor %}
+            {{ done.n }}/{{ phase.stages|length }}
+            <span class="phase-chevron" id="chev-{{ loop.index }}">▼</span>
+          </div>
         </div>
-        <div class="stage-name">{{ s.label }}</div>
-        <div class="stage-actions">
-          {% if status in ('active', 'done') %}
-          <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=s.key.value) }}"
-             class="btn btn-sm btn-secondary">Öffnen</a>
-          {% endif %}
-          {% if status == 'active' %}
-          <form method="POST" action="{{ url_for('project.complete_stage', project_id=project.id, stage_key=s.key.value) }}" style="display:inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-sm btn-success">✓ Fertig</button>
-          </form>
-          {% endif %}
+
+        <div id="ph-{{ loop.index }}" class="phase-stages-list">
+          {% for s in phase.stages %}
+          {% set st = s.stage %}
+          {% set status = st.status.value if st else 'pending' %}
+          <div class="stage-row status-{{ status }}" data-stage-key="{{ s.key.value }}">
+            <div class="stage-status">
+              {% if status == 'done' %}✓{% elif status == 'active' %}→{% else %}○{% endif %}
+            </div>
+            <div class="stage-name">{{ s.label }}</div>
+            <div class="stage-actions">
+              {% if status in ('active', 'done') %}
+              <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=s.key.value) }}"
+                 class="btn btn-sm btn-secondary">Öffnen</a>
+              {% endif %}
+              {% if status == 'active' %}
+              <form method="POST" action="{{ url_for('project.complete_stage', project_id=project.id, stage_key=s.key.value) }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-success">✓ Fertig</button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
         </div>
       </div>
       {% endfor %}
     </div>
-    {% endfor %}
   </div>
 
-  <!-- Right: Agents + Mailbox + AI Chat -->
-  <div>
+  <!-- ── Main Panel: info cards + full-height chat ──────────── -->
+  <div class="chat-panel">
 
-    <!-- ── Finance Agent — критические предупреждения ──────── -->
-    {% if finance_alerts %}
-    <div class="card mb-16" style="border-left:4px solid var(--c-coral);">
-      <div class="card-title" style="font-size:13px;color:var(--c-coral);">⚠️ Finance-Agent: Dringende Hinweise</div>
-      {% for alert in finance_alerts %}
-      <div style="
-        font-size:12px;padding:8px;border-radius:6px;margin-top:8px;
-        background:{% if alert.level == 'critical' %}rgba(239,68,68,0.07){% else %}rgba(251,191,36,0.1){% endif %};
-        border:1px solid {% if alert.level == 'critical' %}rgba(239,68,68,0.3){% else %}rgba(251,191,36,0.4){% endif %};
-      ">
-        <div style="font-weight:600;margin-bottom:3px;color:{% if alert.level == 'critical' %}var(--c-coral){% else %}#b45309{% endif %};">
-          {% if alert.level == 'critical' %}🚨{% else %}⚠️{% endif %} {{ alert.stage_label }}
-        </div>
-        <div style="color:var(--text-m);">{{ alert.message }}</div>
-        <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=alert.stage_key) }}"
-           style="font-size:11px;color:var(--c-blue);display:inline-block;margin-top:4px;">
-          Zum Abschnitt →
-        </a>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
+    <!-- Top info bar (alerts + docs + email — compact, horizontal) -->
+    <div class="info-bar">
 
-    <!-- ── Document Agent — статус документов ──────────────── -->
-    {% if doc_status and doc_status.required %}
-    <div class="card mb-16">
-      <div class="card-title" style="font-size:13px;">📁 Dokumente: {{ doc_status.stage_label }}</div>
-      <div class="flex items-center gap-8 mb-8">
-        <div style="flex:1;background:var(--border);border-radius:4px;height:6px;overflow:hidden;">
-          <div style="background:{% if doc_status.missing_critical > 0 %}var(--c-coral){% elif doc_status.missing_total > 0 %}#f59e0b{% else %}var(--c-green,#16a34a){% endif %};height:100%;width:{{ doc_status.percent_complete }}%;transition:width .3s;"></div>
+      <!-- Expand sidebar button — only visible when collapsed -->
+      <button class="sidebar-expand-btn" id="sidebar-expand" onclick="toggleSidebar()"
+              style="display:none;" title="Phasen anzeigen">☰ Phasen</button>
+
+      {% if finance_alerts %}
+      <div class="info-badge info-badge-warn" title="{{ finance_alerts|length }} Finance-Warnungen">
+        ⚠️ {{ finance_alerts|length }} Finanz-Hinweis{% if finance_alerts|length > 1 %}e{% endif %}
+        <div class="info-dropdown">
+          {% for alert in finance_alerts %}
+          <div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;">
+            <div style="font-weight:600;color:{% if alert.level == 'critical' %}var(--c-coral){% else %}#b45309{% endif %};">
+              {% if alert.level == 'critical' %}🚨{% else %}⚠️{% endif %} {{ alert.stage_label }}
+            </div>
+            <div style="color:var(--text-m);">{{ alert.message }}</div>
+            <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=alert.stage_key) }}"
+               style="font-size:10px;color:var(--c-blue);">Zum Abschnitt →</a>
+          </div>
+          {% endfor %}
         </div>
-        <span style="font-size:11px;color:var(--text-s);white-space:nowrap;">
-          {{ doc_status.percent_complete }}%
-        </span>
-      </div>
-      {% if doc_status.missing_critical > 0 %}
-      <div style="font-size:11px;color:var(--c-coral);margin-bottom:6px;">
-        {{ doc_status.missing_critical }} fehlende Pflichtdokument(e)
       </div>
       {% endif %}
-      <div id="doc-list-preview">
-        {% for doc in doc_status.required[:4] %}
-        <div style="font-size:11px;display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-          {% if doc.uploaded %}
-          <span style="color:var(--c-green,#16a34a);">✓</span>
-          {% elif doc.critical %}
-          <span style="color:var(--c-coral);">✗</span>
-          {% else %}
-          <span style="color:var(--text-s);">○</span>
-          {% endif %}
-          <span style="color:var(--text-m);{% if not doc.uploaded and doc.critical %}font-weight:600;{% endif %}">
-            {{ doc.name }}{% if doc.critical %} *{% endif %}
-          </span>
-        </div>
-        {% endfor %}
-        {% if doc_status.required|length > 4 %}
-        <div style="font-size:11px;color:var(--text-s);margin-top:4px;">
-          + {{ doc_status.required|length - 4 }} weitere...
-        </div>
-        {% endif %}
-      </div>
-      <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=doc_status.stage_key) }}"
-         class="btn btn-sm btn-secondary mt-8" style="font-size:11px;">Alle Dokumente ansehen</a>
-    </div>
-    {% endif %}
 
-    <!-- ── Gmail Mailbox Card ────────────────────────────────── -->
-    <div class="card mb-16" id="mailbox-card">
-      <div class="card-header flex items-center gap-8">
-        <div class="card-title">📧 Projekt-E-Mail</div>
+      {% if doc_status and doc_status.required %}
+      <div class="info-badge {% if doc_status.missing_critical > 0 %}info-badge-warn{% else %}info-badge-ok{% endif %}"
+           title="Dokumente {{ doc_status.stage_label }}">
+        📁 {{ doc_status.percent_complete }}%
+        <div class="info-dropdown">
+          <div style="font-size:12px;font-weight:600;margin-bottom:6px;">{{ doc_status.stage_label }}</div>
+          {% for doc in doc_status.required[:6] %}
+          <div style="font-size:11px;display:flex;gap:4px;margin-bottom:2px;">
+            {% if doc.uploaded %}<span style="color:var(--c-green,#16a34a);">✓</span>
+            {% elif doc.critical %}<span style="color:var(--c-coral);">✗</span>
+            {% else %}<span style="color:var(--text-s);">○</span>{% endif %}
+            <span style="color:var(--text-m);">{{ doc.name }}{% if doc.critical %} *{% endif %}</span>
+          </div>
+          {% endfor %}
+          <a href="{{ url_for('project.stage_detail', project_id=project.id, stage_key=doc_status.stage_key) }}"
+             style="font-size:11px;color:var(--c-blue);display:block;margin-top:6px;">Alle ansehen →</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Email badge -->
+      <div class="info-badge" id="email-badge"
+           style="{% if not (project.mailbox and project.mailbox.is_active) %}opacity:.6;{% endif %}">
         {% if project.mailbox and project.mailbox.is_active %}
-        <span class="badge badge-active ml-auto">Verbunden</span>
-        {% endif %}
-      </div>
-
-      {% if project.mailbox and project.mailbox.is_active %}
-      <!-- Connected state -->
-      <div style="font-size:13px;margin-bottom:10px;">
-        <div style="color:var(--text-m);">{{ project.mailbox.gmail_address }}</div>
-        {% if project.mailbox.last_sync_at %}
-        <div class="text-small text-muted">
-          Zuletzt synchronisiert: {{ project.mailbox.last_sync_at.strftime('%d.%m.%Y %H:%M') }}
-        </div>
-        {% endif %}
-      </div>
-      <div class="flex gap-8" style="flex-wrap:wrap;">
-        <button class="btn btn-primary btn-sm" onclick="openInbox('{{ project.id }}')">
-          📥 Posteingang öffnen
-        </button>
-        <button class="btn btn-secondary btn-sm" onclick="openCompose('{{ project.id }}')">
-          ✉ Neue E-Mail
-        </button>
-        <form method="POST" action="{{ url_for('project.mailbox_disconnect', project_id=project.id) }}"
-              style="display:inline">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-sm"
-                  style="color:var(--c-coral);border-color:var(--c-coral);"
-                  onclick="return confirm('Gmail-Verbindung trennen?')">Trennen</button>
-        </form>
-      </div>
-
-      {% else %}
-      <!-- Setup form -->
-      <div style="font-size:12px;color:var(--text-m);margin-bottom:10px;">
-        Verbinden Sie eine Gmail-Adresse, damit der Agent E-Mails senden, empfangen und
-        Dokumente automatisch importieren kann.
-      </div>
-      <form method="POST" action="{{ url_for('project.mailbox_save', project_id=project.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="form-group" style="margin-bottom:8px;">
-          <label class="form-label">Gmail-Adresse</label>
-          <input type="email" name="gmail_address" class="form-control"
-                 placeholder="projekt@gmail.com" required>
-        </div>
-        <div class="form-group" style="margin-bottom:4px;">
-          <label class="form-label">
-            App-Passwort (16 Zeichen)
-            <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener"
-               style="font-size:11px;color:var(--c-blue);margin-left:6px;">
-              Wie bekomme ich es? →
-            </a>
-          </label>
-          <input type="password" name="app_password" class="form-control"
-                 placeholder="xxxx xxxx xxxx xxxx" maxlength="19" required
-                 pattern="[a-zA-Z0-9 ]{16,19}">
-          <div class="text-small text-muted mt-4">
-            Google-Konto → Sicherheit → 2-Schritt-Verifizierung → App-Passwörter
+        📧 {{ project.mailbox.gmail_address.split('@')[0] }}…
+        <div class="info-dropdown" style="min-width:220px;">
+          <div style="font-size:12px;font-weight:600;margin-bottom:6px;">📧 Projekt-E-Mail</div>
+          <div style="font-size:11px;color:var(--text-m);margin-bottom:8px;">{{ project.mailbox.gmail_address }}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" style="font-size:11px;" onclick="openInbox('{{ project.id }}')">📥 Posteingang</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="openCompose('{{ project.id }}')">✉ Schreiben</button>
           </div>
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm mt-8">Verbinden & testen</button>
-      </form>
-      {% endif %}
-    </div>
-
-    <div class="card" style="position:sticky;top:72px;">
-      <div class="card-header">
-        <div class="card-title">🤖 KI-Assistent</div>
-        <div class="card-subtitle">Für Projekt: {{ project.title }}</div>
-      </div>
-
-      <!-- Quick actions -->
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
-        <button class="btn btn-secondary btn-sm" data-label="Zone analysieren"
-          onclick="requestAiAction('zone', '{{ project.id }}', '{{ project.current_stage.value }}')">
-          Zone analysieren
-        </button>
-        <button class="btn btn-secondary btn-sm" data-label="KfW berechnen"
-          onclick="requestAiAction('kfw', '{{ project.id }}', '{{ project.current_stage.value }}')">
-          KfW-Förderung berechnen
-        </button>
-        <button class="btn btn-secondary btn-sm" data-label="Checkliste erstellen"
-          onclick="requestAiAction('checklist', '{{ project.id }}', '{{ project.current_stage.value }}')">
-          Checkliste für aktuellen Schritt
-        </button>
-        <button class="btn btn-secondary btn-sm" data-label="Brief an Bauamt"
-          onclick="requestAiAction('letter', '{{ project.id }}', '{{ project.current_stage.value }}')">
-          Brief an Bauamt vorbereiten
-        </button>
-        <button class="btn btn-secondary btn-sm" data-label="Fachleute suchen"
-          onclick="requestAiAction('providers', '{{ project.id }}', '{{ project.current_stage.value }}')">
-          Fachleute für diesen Schritt
-        </button>
-      </div>
-
-      <div class="ai-result-container"></div>
-
-      <!-- Full chat -->
-      <div class="ai-chat-wrap mt-16">
-        <div class="ai-chat-body" id="ai-chat-body" style="height:240px;">
-          <div class="ai-msg ai-msg-bot">
-            Ich begleite Ihr Projekt "{{ project.title }}". Was möchten Sie wissen oder womit soll ich helfen?
-          </div>
-        </div>
-        <div class="ai-chat-footer">
-          <form id="ai-chat-form" class="flex gap-8 w-full">
-            <input type="text" id="ai-input" class="form-control ai-chat-input"
-                   placeholder="Frage stellen...">
-            <button type="submit" class="btn btn-primary btn-sm">→</button>
+          <form method="POST" action="{{ url_for('project.mailbox_disconnect', project_id=project.id) }}" style="margin-top:8px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm" style="font-size:10px;color:var(--c-coral);border-color:var(--c-coral);"
+                    onclick="return confirm('Gmail-Verbindung trennen?')">Trennen</button>
           </form>
         </div>
+        {% else %}
+        📧 E-Mail einrichten
+        <div class="info-dropdown" style="min-width:260px;">
+          <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Gmail verbinden</div>
+          <form method="POST" action="{{ url_for('project.mailbox_save', project_id=project.id) }}" style="display:flex;flex-direction:column;gap:6px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="email" name="gmail_address" class="form-control" placeholder="projekt@gmail.com" required style="font-size:12px;">
+            <input type="password" name="app_password" class="form-control" placeholder="App-Passwort (16 Zeichen)" maxlength="19" required style="font-size:12px;">
+            <button type="submit" class="btn btn-primary btn-sm" style="font-size:11px;">Verbinden</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <a href="{{ url_for('project.cameras', project_id=project.id) }}" class="btn btn-secondary btn-sm" style="font-size:11px;">📷</a>
+        <a href="{{ url_for('project.financing', project_id=project.id) }}" class="btn btn-secondary btn-sm" style="font-size:11px;">Finanzierung</a>
+      </div>
+    </div>
+
+    <!-- ── Full-height AI Chat ─────────────────────────────── -->
+    <div class="chat-main">
+      <!-- Chat header -->
+      <div class="chat-header-bar">
+        <div>
+          <span style="font-weight:600;font-size:14px;">🤖 KI-Assistent</span>
+          <span class="text-muted" style="font-size:12px;margin-left:8px;">{{ project.title }}</span>
+        </div>
+        <div class="ai-result-container" style="margin-left:auto;"></div>
+      </div>
+
+      <!-- Messages area -->
+      <div class="ai-chat-body" id="ai-chat-body">
+        <div class="ai-msg ai-msg-bot">
+          Willkommen beim Projekt <strong>{{ project.title }}</strong>.
+          Ich helfe Ihnen bei Grundstückssuche, Behördengängen, Planung und Bau.
+          Sie können Dokumente und Fotos direkt hier hochladen.
+        </div>
+      </div>
+
+      <!-- Attachment preview chip -->
+      <div id="chat-attach-bar" style="display:none;padding:6px 14px;background:var(--c-gray-l);border-top:1px solid var(--border);display:none;align-items:center;gap:8px;">
+        <span style="font-size:11px;">📎</span>
+        <span id="chat-attach-name" style="font-size:12px;color:var(--text-m);"></span>
+        <button onclick="AiChat.clearFile()" style="background:none;border:none;color:var(--text-s);cursor:pointer;font-size:14px;line-height:1;padding:0 4px;">×</button>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="chat-toolbar">
+        <!-- File attach -->
+        <input type="file" id="chat-file-input" style="display:none;"
+               accept=".pdf,.txt,.docx,.jpg,.jpeg,.png,.webp,.gif">
+        <button class="chat-tool-btn" id="btn-attach" onclick="document.getElementById('chat-file-input').click()"
+                title="Dokument oder Foto anhängen">📎 Anhängen</button>
+
+        <!-- Browser toggle -->
+        <button class="chat-tool-btn chat-tool-active" id="btn-browser" onclick="AiChat.toggleBrowser()"
+                title="Websuche aktivieren/deaktivieren">🔍 Websuche</button>
+
+        <div style="width:1px;background:var(--border);height:18px;margin:0 4px;"></div>
+
+        <!-- Quick actions -->
+        <button class="chat-tool-btn"
+          onclick="requestAiAction('zone','{{ project.id }}','{{ project.current_stage.value }}')">🏘 Zonen</button>
+        <button class="chat-tool-btn"
+          onclick="requestAiAction('kfw','{{ project.id }}','{{ project.current_stage.value }}')">💶 KfW</button>
+        <button class="chat-tool-btn"
+          onclick="requestAiAction('checklist','{{ project.id }}','{{ project.current_stage.value }}')">✓ Checklist</button>
+        <button class="chat-tool-btn"
+          onclick="requestAiAction('letter','{{ project.id }}','{{ project.current_stage.value }}')">✉ Brief</button>
+        <button class="chat-tool-btn"
+          onclick="requestAiAction('providers','{{ project.id }}','{{ project.current_stage.value }}')">👷 Fachleute</button>
+      </div>
+
+      <!-- Input row -->
+      <div class="chat-input-row">
+        <textarea id="ai-input" class="chat-textarea" rows="2"
+                  placeholder="Frage stellen… (Enter = senden, Shift+Enter = neue Zeile)"></textarea>
+        <button id="chat-send-btn" class="btn btn-primary chat-send-btn" onclick="AiChat.send()">→</button>
       </div>
     </div>
   </div>
 
 </div>
+
+<script>
+// ── Sidebar collapse ──────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const ws = document.getElementById('project-workspace');
+  const btn = document.getElementById('sidebar-toggle');
+  const expand = document.getElementById('sidebar-expand');
+  const collapsed = ws.classList.toggle('sidebar-collapsed');
+  btn.textContent = collapsed ? '▶' : '◀';
+  expand.style.display = collapsed ? 'flex' : 'none';
+}
+
+// ── Phase collapse ────────────────────────────────────────────────────────────
+function togglePhase(id) {
+  const el = document.getElementById(id);
+  const idx = id.split('-')[1];
+  const chev = document.getElementById('chev-' + idx);
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  if (chev) chev.style.transform = open ? 'rotate(-90deg)' : '';
+}
+</script>
 {% endblock %}
 
 {% block scripts %}

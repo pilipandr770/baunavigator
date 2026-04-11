@@ -130,13 +130,25 @@ def provider_chat(provider_id):
 @ai_bp.route('/chat', methods=['POST'])
 @login_required
 def chat():
-    """Общий чат с ИИ-ассистентом."""
-    data = request.get_json() or {}
-    message = data.get('message', '').strip()
-    project_id = data.get('project_id')
-    stage_key_str = data.get('stage_key')
+    """Общий чат с ИИ-ассистентом. Поддерживает JSON и multipart (с файлом)."""
+    import re as _re
 
-    if not message:
+    # Поддержка multipart (файл) и JSON
+    if request.content_type and 'multipart' in request.content_type:
+        message       = request.form.get('message', '').strip()
+        project_id    = request.form.get('project_id')
+        stage_key_str = request.form.get('stage_key')
+        use_browser   = request.form.get('use_browser', 'true').lower() != 'false'
+        uploaded_file = request.files.get('file')
+    else:
+        data          = request.get_json() or {}
+        message       = data.get('message', '').strip()
+        project_id    = data.get('project_id')
+        stage_key_str = data.get('stage_key')
+        use_browser   = data.get('use_browser', True)
+        uploaded_file = None
+
+    if not message and not uploaded_file:
         return jsonify({'error': 'Сообщение пустое'}), 400
 
     project = None
@@ -152,6 +164,35 @@ def chat():
         except ValueError:
             pass
 
+    extra = {}
+
+    # Обработка загруженного файла — читаем текст, изображения передаём как base64
+    if uploaded_file:
+        filename = uploaded_file.filename or ''
+        mime = uploaded_file.mimetype or ''
+        raw = uploaded_file.read(500_000)  # max 500 KB
+
+        if mime.startswith('image/') or _re.search(r'\.(jpg|jpeg|png|gif|webp)$', filename, _re.I):
+            import base64
+            b64 = base64.b64encode(raw).decode()
+            extra['_image_b64'] = b64
+            extra['_image_mime'] = mime or 'image/jpeg'
+            extra['_image_filename'] = filename
+            if not message:
+                message = f'Bitte analysiere dieses Bild: {filename}'
+        else:
+            # Text / PDF: extract text content
+            try:
+                text = raw.decode('utf-8', errors='replace')
+            except Exception:
+                text = raw.decode('latin-1', errors='replace')
+            # Strip obvious binary chars
+            text = _re.sub(r'[^\x09\x0a\x0d\x20-\x7e\x80-\xff]', ' ', text)
+            text = _re.sub(r'\s{4,}', '\n', text).strip()
+            extra['Hochgeladenes Dokument'] = f'{filename}\n\n{text[:8000]}'
+            if not message:
+                message = f'Bitte analysiere dieses Dokument: {filename}'
+
     result = ask_ai(
         user_message=message,
         project=project,
@@ -159,6 +200,8 @@ def chat():
         action_type=ActionType.GENERAL_CONSULT,
         mode=ActionMode.CONFIRMATION_REQUIRED,
         user_id=current_user.id,
+        use_browser=bool(use_browser),
+        extra_context=extra or None,
     )
     return jsonify(result)
 
@@ -490,7 +533,18 @@ def my_parcels():
 @map_bp.route('/api/gemeinden')
 @login_required
 def api_gemeinden():
+    from app.models.models import Parcel
+    from sqlalchemy import func
     gemeinden = Gemeinde.query.filter_by(land='HE').all()
+
+    # Build parcel count per gemeinde in one query
+    parcel_counts = dict(
+        db.session.query(Parcel.gemeinde_id, func.count(Parcel.id))
+        .filter(Parcel.gemeinde_id.isnot(None))
+        .group_by(Parcel.gemeinde_id)
+        .all()
+    )
+
     return jsonify([{
         'id': g.id,
         'name': g.name,
@@ -505,6 +559,7 @@ def api_gemeinden():
         'bauordnung_url': g.bauordnung_url,
         'lat': float(g.lat) if g.lat else None,
         'lng': float(g.lng) if g.lng else None,
+        'parcel_count': parcel_counts.get(g.id, 0),
     } for g in gemeinden])
 
 
@@ -691,7 +746,82 @@ def api_parcel_delete(parcel_id):
     return jsonify({'ok': True})
 
 
-# ─── Providers Blueprint ───────────────────────────────────────────────────────
+@map_bp.route('/api/wfs/alkis')
+@login_required
+def api_wfs_alkis():
+    """Proxy for HVBG INSPIRE WFS — ALKIS Flurstücke (CadastralParcel).
+    Fetches only the features within the requested bounding box so we never
+    store or cache HVBG data locally.
+    Query params: bbox=south,west,north,east  (EPSG:4326)
+    """
+    import re
+    import requests as _req
+
+    bbox = request.args.get('bbox', '').strip()
+    # Validate: 4 floats separated by commas
+    if not re.fullmatch(r'-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?', bbox):
+        return jsonify({'error': 'Invalid bbox'}), 400
+
+    # Only fetch when user has zoomed in enough (bbox area < ~0.1 deg²)
+    parts = [float(x) for x in bbox.split(',')]
+    area = (parts[2] - parts[0]) * (parts[3] - parts[1])
+    if area > 0.08:
+        return jsonify({'type': 'FeatureCollection', 'features': [],
+                        '_hint': 'zoom_in'}), 200
+
+    wfs_url = (
+        'https://www.geoportal.hessen.de/inspire/wfs/lk'
+        '?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature'
+        '&TYPENAMES=CP:CadastralParcel'
+        f'&BBOX={bbox},EPSG:4326'
+        '&SRSNAME=EPSG:4326'
+        '&OUTPUTFORMAT=application/json'
+        '&COUNT=500'
+    )
+    try:
+        resp = _req.get(wfs_url, timeout=10,
+                        headers={'User-Agent': 'BauNavigator/1.0'})
+        resp.raise_for_status()
+        return resp.content, resp.status_code, {'Content-Type': 'application/json'}
+    except _req.RequestException as e:
+        return jsonify({'error': str(e)}), 502
+
+
+@map_bp.route('/api/wfs/boris')
+@login_required
+def api_wfs_boris():
+    """Proxy for HVBG BORIS Bodenrichtwerte WFS."""
+    import re
+    import requests as _req
+
+    bbox = request.args.get('bbox', '').strip()
+    if not re.fullmatch(r'-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?', bbox):
+        return jsonify({'error': 'Invalid bbox'}), 400
+
+    parts = [float(x) for x in bbox.split(',')]
+    area = (parts[2] - parts[0]) * (parts[3] - parts[1])
+    if area > 0.15:
+        return jsonify({'type': 'FeatureCollection', 'features': [],
+                        '_hint': 'zoom_in'}), 200
+
+    wfs_url = (
+        'https://www.geoportal.hessen.de/inspire/wfs/boris'
+        '?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature'
+        '&TYPENAMES=BRW:Bodenrichtwert'
+        f'&BBOX={bbox},EPSG:4326'
+        '&SRSNAME=EPSG:4326'
+        '&OUTPUTFORMAT=application/json'
+        '&COUNT=300'
+    )
+    try:
+        resp = _req.get(wfs_url, timeout=10,
+                        headers={'User-Agent': 'BauNavigator/1.0'})
+        resp.raise_for_status()
+        return resp.content, resp.status_code, {'Content-Type': 'application/json'}
+    except _req.RequestException as e:
+        return jsonify({'error': str(e)}), 502
+
+
 providers_bp = Blueprint('providers', __name__)
 
 
